@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 
+const authRoutes = require('./routes/authRoutes'); // Add this import
+
 const app = express();
 
 // Global Middlewares
@@ -21,5 +23,7 @@ app.get('/', (req, res) => {
     message: 'BioBeats API is running!',
   });
 });
+// Routes
+app.use('/api/auth', authRoutes); // Mount the auth routes at /api/auth
 
 module.exports = app;
