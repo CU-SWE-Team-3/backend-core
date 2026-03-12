@@ -1,0 +1,13 @@
+require("dotenv").config();
+const app = require("./src/app");
+const connectDB = require("./src/config/db"); // Import your new config file
+
+const PORT = process.env.PORT || 5000;
+
+// 1. Initialize Database Connection
+connectDB();
+
+// 2. Start Express Server
+app.listen(PORT, () =>
+  console.log(`🚀 BioBeats Server running on port ${PORT}`),
+);
