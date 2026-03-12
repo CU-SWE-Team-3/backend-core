@@ -1,7 +1,7 @@
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
 
 const app = express();
 
@@ -11,14 +11,14 @@ app.use(cors());
 app.use(express.json());
 console.log(process.env.NODE_ENV);
 
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
 }
 // Health-Check Route
-app.get("/", (req, res) => {
+app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: "BioBeats API is running!",
+    message: 'BioBeats API is running!',
   });
 });
 
