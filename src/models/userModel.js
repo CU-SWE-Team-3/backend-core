@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const slug = require('mongoose-slug-updater'); // 1. Add this import
 
+mongoose.plugin(slug); // 2. Activate the plugin
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -15,46 +17,50 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      // CRITICAL FOR BE-2: Password is NOT required if logging in via Google
       required: function () {
         return !this.googleId;
       },
       minlength: 8,
-      select: false, // Security: Prevents password from being returned in standard queries
+      select: false,
     },
     googleId: {
       type: String,
       unique: true,
-      sparse: true, // Allows multiple users to have a 'null' googleId without triggering a Unique constraint error
+      sparse: true,
     },
     refreshToken: {
-      type: String, // BE-2: Stores the long-lived JWT for session management
+      type: String,
     },
 
     // ==========================================
-    // 2. PROFILE & ASSETS (BE-3)
+    // 2. PROFILE & ASSETS (BE-3) - CLEANED & MERGED
     // ==========================================
     permalink: {
       type: String,
       unique: true,
       sparse: true,
       trim: true,
+      slug: 'displayName', // <--- 3. THIS IS THE MAGIC LINE!
+      slugPaddingSize: 1,
     },
     displayName: {
       type: String,
       required: [true, 'Display name is required'],
       trim: true,
     },
-    age: {
-      type: Number,
-    },
+    age: { type: Number },
     gender: {
       type: String,
       enum: ['Female', 'Male', 'Custom', 'Prefer not to say'],
     },
-    location: { type: String, default: '' },
-    bio: { type: String, default: '' },
-    favoriteGenres: [{ type: String }],
+    bio: {
+      type: String,
+      maxLength: [500, 'Bio cannot exceed 500 characters'],
+      default: '',
+    },
+    country: { type: String, default: '' },
+    city: { type: String, default: '' },
+    genres: [{ type: String, trim: true }], // Merged from favoriteGenres
     socialLinks: {
       instagram: { type: String, default: '' },
       twitter: { type: String, default: '' },
@@ -62,13 +68,12 @@ const userSchema = new mongoose.Schema(
     },
     avatarUrl: {
       type: String,
-      // default:
-      //   'https://res.cloudinary.com/demo/image/upload/v1/default_avatar.png',
+      default: 'default-avatar.png',
     },
-    coverPhotoUrl: {
+    coverUrl: {
+      // Merged from coverPhotoUrl
       type: String,
-      // default:
-      //   'https://res.cloudinary.com/demo/image/upload/v1/default_cover.jpg',
+      default: 'default-cover.png',
     },
 
     // ==========================================
@@ -77,7 +82,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: ['Artist', 'Listener', 'Admin'],
-      default: 'Listener', // Users start as listeners and upgrade to Artist when they upload
+      default: 'Listener',
     },
     isPrivate: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
@@ -95,7 +100,7 @@ const userSchema = new mongoose.Schema(
     followingCount: { type: Number, default: 0 },
   },
   {
-    timestamps: true, // Automatically manages createdAt and updatedAt
+    timestamps: true,
   }
 );
 
@@ -103,13 +108,10 @@ const userSchema = new mongoose.Schema(
 // MODEL MIDDLEWARE & METHODS
 // ==========================================
 
-// Pre-save hook: Hash the password before saving to the database
 userSchema.pre('save', async function (next) {
-  // Only hash if the password was modified AND exists (skips for Google OAuth users)
   if (!this.isModified('password') || !this.password) {
     return next();
   }
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -119,24 +121,16 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Helper Method: Compare an entered password against the hashed DB password
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  // We have to explicitly compare because 'select: false' hides it by default
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// ==========================================
 // SECURITY: Hide private data from JSON responses
-// ==========================================
 userSchema.methods.toJSON = function () {
-  // Convert the Mongoose document into a plain JavaScript object
   const userObject = this.toObject();
-
-  // Delete the fields we NEVER want to send to the frontend
   delete userObject.refreshToken;
-  delete userObject.password; // Good to have if you add local email/pass login later
-  delete userObject.__v; // Removes Mongoose's internal versioning field
-
+  delete userObject.password;
+  delete userObject.__v;
   return userObject;
 };
 

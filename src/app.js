@@ -5,6 +5,8 @@ const morgan = require('morgan');
 
 const authRoutes = require('./routes/authRoutes'); // Add this import
 
+const profileRoutes = require('./routes/profileRoutes');
+
 const app = express();
 
 // Global Middlewares
@@ -25,5 +27,7 @@ app.get('/', (req, res) => {
 });
 // Routes
 app.use('/api/auth', authRoutes); // Mount the auth routes at /api/auth
+
+app.use('/api/profile', profileRoutes);
 
 module.exports = app;
