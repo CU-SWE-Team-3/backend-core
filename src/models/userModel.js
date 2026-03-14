@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const slug = require('mongoose-slug-updater');
 
+mongoose.plugin(slug);
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -39,6 +41,8 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
+      slug: 'displayName', // <--- 3. THIS IS THE MAGIC LINE!
+      slugPaddingSize: 1,
     },
     displayName: {
       type: String,
@@ -87,6 +91,13 @@ const userSchema = new mongoose.Schema(
       enum: ['Active', 'Suspended', 'Deleted'],
       default: 'Active',
     },
+
+    // ==========================================
+    // BE-1: VERIFICATION & RECOVERY TOKENS
+    // ==========================================
+    emailVerificationToken: String,
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 
     // ==========================================
     // 4. SOCIAL GRAPH COUNTS (Module 3)
