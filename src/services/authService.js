@@ -1,90 +1,51 @@
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
+const axios = require('axios'); // Needed for CAPTCHA verification
 const User = require('../models/userModel');
+const sendEmail = require('../utils/sendEmail');
 
-// Initialize the Google Client
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
 
-// ==========================================
-// 1. JWT TOKEN MANAGEMENT
-// ==========================================
-
-/**
- * Generates both short-lived access and long-lived refresh tokens.
- * Saves the refresh token to the database.
- */
 const generateTokens = async (user) => {
-  // The payload is the data hidden inside the token
   const payload = { id: user._id, role: user.role };
-
-  // Access Token (Expires in 15 mins) -> Sent in Authorization header
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-  // Refresh Token (Expires in 7 days) -> Stored in DB and often sent in a secure cookie or body
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
     expiresIn: '7d',
   });
-
-  // Save the refresh token to the DB so we can revoke it later if needed
   user.refreshToken = refreshToken;
   await user.save();
-
   return { token, refreshToken };
 };
 
-/**
- * Verifies an incoming refresh token and rotates it for a new pair.
- */
 const verifyRefreshToken = async (incomingRefreshToken) => {
   try {
-    // 1. Verify the signature mathematically
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.JWT_REFRESH_SECRET
     );
-
-    // 2. Find the user
     const user = await User.findById(decoded.id);
-
-    // 3. Ensure the token matches the one in the database (Prevents revoked token usage)
     if (!user || user.refreshToken !== incomingRefreshToken) {
       throw new Error('Invalid or revoked refresh token');
     }
-
-    // 4. Issue a fresh pair of tokens (Token Rotation)
     return generateTokens(user);
   } catch (error) {
     throw new Error('Unauthorized');
   }
 };
 
-// ==========================================
-// 2. GOOGLE OAUTH FLOW
-// ==========================================
-
-/**
- * Generates the URL to redirect the user to Google's login screen.
- */
 const getGoogleAuthUrl = () =>
   googleClient.generateAuthUrl({
-    access_type: 'offline', // Gets a refresh token from Google if needed
-    scope: ['email', 'profile'], // We just want their email and public profile info
+    access_type: 'offline',
+    scope: ['email', 'profile'],
   });
 
-/**
- * Handles the redirect back from Google, verifies the user, and logs them in.
- */
-
-/**
- * PRIVATE HELPER: Finds an existing user or creates a new one from a Google Payload.
- */
 const findOrCreateGoogleUser = async (payload) => {
   let user = await User.findOne({ email: payload.email });
-
   if (!user) {
     user = new User({
       email: payload.email,
@@ -98,39 +59,23 @@ const findOrCreateGoogleUser = async (payload) => {
     user.googleId = payload.sub;
     await user.save();
   }
-
   return user;
 };
 
-/**
- * Handles Web Redirect Login
- */
 const handleGoogleCallback = async (code) => {
-  // 1. Get tokens and payload from Google
   const { tokens } = await googleClient.getToken(code);
-  // console.log('🔥 GRAB THIS ID_TOKEN FOR POSTMAN:', tokens.id_token);
   googleClient.setCredentials(tokens);
-
   const ticket = await googleClient.verifyIdToken({
     idToken: tokens.id_token,
     audience: process.env.GOOGLE_CLIENT_ID,
   });
   const payload = ticket.getPayload();
-
-  // 2. Use our DRY helper function!
   const user = await findOrCreateGoogleUser(payload);
-
-  // 3. Generate tokens
   const { token, refreshToken } = await generateTokens(user);
-
   return { user, token, refreshToken };
 };
 
-/**
- * Handles Mobile Native Login
- */
 const handleMobileGoogleLogin = async (idToken) => {
-  // 1. Verify the mobile token with Google
   const ticket = await googleClient.verifyIdToken({
     idToken: idToken,
     audience: [
@@ -140,14 +85,114 @@ const handleMobileGoogleLogin = async (idToken) => {
     ],
   });
   const payload = ticket.getPayload();
-
-  // 2. Use our DRY helper function again!
   const user = await findOrCreateGoogleUser(payload);
-
-  // 3. Generate tokens
   const { token, refreshToken } = await generateTokens(user);
-
   return { user, token, refreshToken };
+};
+
+const loginUser = async (email, password) => {
+  const user = await User.findOne({ email }).select('+password');
+  if (!user) throw new Error('Invalid email or password.');
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) throw new Error('Invalid email or password.');
+  return user;
+};
+
+// UPDATED: Now requires and verifies a CAPTCHA token
+const registerUser = async (userData, captchaToken) => {
+  if (!captchaToken) throw new Error('CAPTCHA token is required.');
+
+  // Verify CAPTCHA with Google
+  const captchaVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${captchaToken}`;
+  const captchaResponse = await axios.post(captchaVerifyUrl);
+
+  if (!captchaResponse.data.success) {
+    throw new Error('CAPTCHA verification failed. Are you a bot?');
+  }
+
+  const existingUser = await User.findOne({ email: userData.email });
+  if (existingUser) throw new Error('Email is already registered.');
+
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+
+  const user = await User.create({
+    ...userData,
+    // permalink,
+    emailVerificationToken: verificationToken,
+  });
+
+  const verificationUrl = `http://localhost:5000/api/auth/verify-email?token=${verificationToken}`;
+  const message = `Welcome to BioBeats, ${user.displayName}!\n\nPlease verify your account by clicking the link below:\n\n${verificationUrl}\n\nIf you did not request this, please ignore this email.`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'BioBeats Account Verification',
+      message,
+    });
+  } catch (err) {
+    console.error('Email delivery failed:', err.message);
+  }
+
+  return { user, verificationToken };
+};
+
+const verifyEmail = async (token) => {
+  const user = await User.findOne({ emailVerificationToken: token });
+  if (!user) throw new Error('Invalid or expired verification token.');
+  user.isEmailVerified = true;
+  user.emailVerificationToken = undefined;
+  await user.save();
+  return user;
+};
+
+const generatePasswordReset = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error('No user found with that email.');
+
+  const resetToken = crypto.randomBytes(20).toString('hex');
+  user.resetPasswordToken = resetToken;
+  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+  await user.save();
+
+  // NEW: Actually send the email via Nodemailer!
+  const message = `You are receiving this email because you (or someone else) requested a password reset for your BioBeats account.\n\nPlease use the following token to reset your password:\n\n${resetToken}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'BioBeats Password Reset Token',
+      message,
+    });
+  } catch (err) {
+    console.error('Email delivery failed:', err.message);
+    // If email fails, wipe the token so they can try again
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+    throw new Error('Email could not be sent. Please try again later.');
+  }
+
+  return { user, resetToken };
+};
+
+const resetPassword = async (token, newPassword) => {
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpire: { $gt: Date.now() },
+  });
+  if (!user) throw new Error('Invalid or expired password reset token.');
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+  await user.save();
+  return user;
+};
+
+// NEW: Logout User Function
+const logoutUser = async (userId) => {
+  await User.findByIdAndUpdate(userId, { refreshToken: null });
+  return true;
 };
 
 module.exports = {
@@ -156,4 +201,10 @@ module.exports = {
   getGoogleAuthUrl,
   handleGoogleCallback,
   handleMobileGoogleLogin,
+  registerUser,
+  verifyEmail,
+  generatePasswordReset,
+  resetPassword,
+  loginUser,
+  logoutUser,
 };

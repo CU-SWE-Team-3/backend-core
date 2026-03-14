@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const slug = require('mongoose-slug-updater'); // 1. Add this import
+const slug = require('mongoose-slug-updater');
 
-mongoose.plugin(slug); // 2. Activate the plugin
+mongoose.plugin(slug);
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -92,6 +92,13 @@ const userSchema = new mongoose.Schema(
       enum: ['Active', 'Suspended', 'Deleted'],
       default: 'Active',
     },
+
+    // ==========================================
+    // BE-1: VERIFICATION & RECOVERY TOKENS
+    // ==========================================
+    emailVerificationToken: String,
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 
     // ==========================================
     // 4. SOCIAL GRAPH COUNTS (Module 3)
