@@ -9,6 +9,8 @@ const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/authRoutes');
 
+const profileRoutes = require('./routes/profileRoutes');
+
 const app = express();
 
 // ==========================================
@@ -74,5 +76,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+
+app.use('/api/profile', profileRoutes);
 
 module.exports = app;
