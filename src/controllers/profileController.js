@@ -1,4 +1,4 @@
-const ProfileService = require('../services/profileService');
+const profileService = require('../services/profileService');
 
 // ==========================================
 // 1. Update Privacy
@@ -8,7 +8,7 @@ exports.updatePrivacy = async (req, res, next) => {
     const { id } = req.params;
     const { isPrivate } = req.body;
 
-    const updatedUser = await ProfileService.updatePrivacy(id, isPrivate);
+    const updatedUser = await profileService.updatePrivacy(id, isPrivate);
 
     res.status(200).json({
       status: 'success',
@@ -28,12 +28,32 @@ exports.updateSocialLinks = async (req, res, next) => {
     const { id } = req.params;
     const { socialLinks } = req.body; // بنستقبل Object فيه انستجرام وتويتر زي الـ Schema
 
-    const updatedUser = await ProfileService.updateSocialLinks(id, socialLinks);
+    const updatedUser = await profileService.updateSocialLinks(id, socialLinks);
 
     res.status(200).json({
       status: 'success',
       message: 'Social links updated successfully',
       data: { socialLinks: updatedUser.socialLinks },
+
+exports.updateProfile = async (req, res, next) => {
+  try {
+    // FIXED: Removed the optional chaining (?.)
+    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
+
+    const updatedUser = await profileService.updateProfileData(
+      userId,
+      req.body
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
     });
   } catch (error) {
     next(error);
@@ -46,12 +66,37 @@ exports.removeSocialLink = async (req, res, next) => {
   try {
     const { id, linkId } = req.params; // هناخد الـ id بتاع اليوزر والـ linkId بتاع اللينك
 
-    const updatedUser = await ProfileService.removeSocialLink(id, linkId);
+    const updatedUser = await profileService.removeSocialLink(id, linkId);
 
     res.status(200).json({
       status: 'success',
       message: 'Social link removed successfully',
       data: { socialLinks: updatedUser.socialLinks },
+exports.uploadAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Please upload an image file' });
+    }
+
+    // FIXED: Removed the optional chaining (?.)
+    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
+
+    const updatedUser = await profileService.updateProfileImage(
+      userId,
+      'avatar'
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
     });
   } catch (error) {
     next(error);
@@ -66,7 +111,7 @@ exports.updateTier = async (req, res, next) => {
     const { id } = req.params;
     const { role } = req.body;
 
-    const updatedUser = await ProfileService.updateTier(id, role);
+    const updatedUser = await profileService.updateTier(id, role);
 
     res.status(200).json({
       status: 'success',

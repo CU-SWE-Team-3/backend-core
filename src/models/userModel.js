@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const slug = require('mongoose-slug-updater');
 
+mongoose.plugin(slug);
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -38,6 +40,8 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
+      slug: 'displayName', // <--- 3. THIS IS THE MAGIC LINE!
+      slugPaddingSize: 1,
     },
     displayName: {
       type: String,
@@ -58,7 +62,6 @@ const userSchema = new mongoose.Schema(
     city: { type: String, default: '' },
     genres: [{ type: String, trim: true }],
 
-    // 👇 التعديل بتاعك عشان يقبل Array زي ما برمجناها
     socialLinks: {
       type: [
         {
@@ -79,6 +82,7 @@ const userSchema = new mongoose.Schema(
       default: 'default-avatar.png',
     },
     coverUrl: {
+      // Merged from coverPhotoUrl
       type: String,
       default: 'default-cover.png',
     },
@@ -86,11 +90,10 @@ const userSchema = new mongoose.Schema(
     // ==========================================
     // 3. ROLES, PRIVACY & STATUS (BE-4)
     // ==========================================
-    // 👇 التعديل بتاعك عشان الحروف تبقى صغيرة وماتعملش Error
     role: {
       type: String,
-      enum: ['artist', 'listener', 'admin'],
-      default: 'listener',
+      enum: ['Artist', 'Listener', 'Admin'],
+      default: 'Listener',
     },
     isPrivate: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
@@ -100,6 +103,13 @@ const userSchema = new mongoose.Schema(
       enum: ['Active', 'Suspended', 'Deleted'],
       default: 'Active',
     },
+
+    // ==========================================
+    // BE-1: VERIFICATION & RECOVERY TOKENS
+    // ==========================================
+    emailVerificationToken: String,
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 
     // ==========================================
     // 4. SOCIAL GRAPH COUNTS (Module 3)
