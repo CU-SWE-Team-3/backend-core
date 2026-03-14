@@ -65,14 +65,25 @@ exports.updateProfileData = async (userId, updateData) => {
 };
 
 // Removed fileBuffer parameter here to fix the ESLint error!
-exports.updateProfileImage = async (userId, imageType) => {
-  // Mocking the image URL since we don't have Cloudinary set up yet
-  const mockImageUrl = `https://biobeats-assets.com/${imageType}-${Date.now()}.png`;
+exports.updateProfileImages = async (userId, uploadedFiles) => {
+  // 1. Create an empty object to hold our dynamic updates
+  const updateFields = {};
 
-  const updateField =
-    imageType === 'avatar'
-      ? { avatarUrl: mockImageUrl }
-      : { coverUrl: mockImageUrl };
+  // 2. Did they upload an avatar? If yes, generate the URL and add it to the object.
+  if (uploadedFiles.avatar) {
+    updateFields.avatarUrl = `https://biobeats-assets.com/avatar-${Date.now()}.png`;
+  }
 
-  return User.findByIdAndUpdate(userId, { $set: updateField }, { new: true });
+  // 3. Did they upload a cover? If yes, generate the URL and add it to the object.
+  if (uploadedFiles.cover) {
+    updateFields.coverUrl = `https://biobeats-assets.com/cover-${Date.now()}.png`;
+  }
+
+  // 4. Safety check: If they somehow bypassed the controller check, don't crash the DB
+  if (Object.keys(updateFields).length === 0) {
+    throw new Error('No valid image fields provided');
+  }
+
+  // 5. Execute a SINGLE database update with whatever is inside updateFields
+  return User.findByIdAndUpdate(userId, { $set: updateFields }, { new: true });
 };

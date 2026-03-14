@@ -6,20 +6,28 @@ const { protect } = require('../middlewares/authMiddleware');
 const router = express.Router();
 
 // Route: /api/v1/profiles
-router.patch('/:id/privacy', profileController.updatePrivacy);
-router.patch('/:id/social-links', profileController.updateSocialLinks);
-router.delete('/:id/social-links/:linkId', profileController.removeSocialLink);
-router.patch('/:id/tier', profileController.updateTier);
+router.patch('/privacy', protect, profileController.updatePrivacy);
+router.patch('/social-links', protect, profileController.updateSocialLinks);
+router.delete(
+  '/social-links/:linkId',
+  protect,
+  profileController.removeSocialLink
+);
+router.patch('/tier', protect, profileController.updateTier);
 
 // 2. Local Files Second
 router.patch('/update', protect, profileController.updateProfile);
 
 // Avatar Upload Route (protect goes first, then multer upload, then controller)
 router.patch(
-  '/avatar',
+  '/upload-images',
   protect,
-  upload.single('avatar'),
-  profileController.uploadAvatar
+  // NEW: We tell Multer to accept up to 1 avatar AND up to 1 cover simultaneously!
+  upload.fields([
+    { name: 'avatar', maxCount: 1 },
+    { name: 'cover', maxCount: 1 },
+  ]),
+  profileController.uploadProfileImages
 );
 
 module.exports = router;

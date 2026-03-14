@@ -5,10 +5,17 @@ const profileService = require('../services/profileService');
 // ==========================================
 exports.updatePrivacy = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
+
     const { isPrivate } = req.body;
 
-    const updatedUser = await profileService.updatePrivacy(id, isPrivate);
+    const updatedUser = await profileService.updatePrivacy(userId, isPrivate);
 
     res.status(200).json({
       status: 'success',
@@ -25,15 +32,29 @@ exports.updatePrivacy = async (req, res, next) => {
 // ==========================================
 exports.updateSocialLinks = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { socialLinks } = req.body; // بنستقبل Object فيه انستجرام وتويتر زي الـ Schema
+    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
 
-    const updatedUser = await profileService.updateSocialLinks(id, socialLinks);
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
+    const { socialLinks } = req.body;
+
+    const updatedUser = await profileService.updateSocialLinks(
+      userId,
+      socialLinks
+    );
 
     res.status(200).json({
       status: 'success',
       message: 'Social links updated successfully',
       data: { socialLinks: updatedUser.socialLinks },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.updateProfile = async (req, res, next) => {
   try {
@@ -64,23 +85,6 @@ exports.updateProfile = async (req, res, next) => {
 // ==========================================
 exports.removeSocialLink = async (req, res, next) => {
   try {
-    const { id, linkId } = req.params; // هناخد الـ id بتاع اليوزر والـ linkId بتاع اللينك
-
-    const updatedUser = await profileService.removeSocialLink(id, linkId);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Social link removed successfully',
-      data: { socialLinks: updatedUser.socialLinks },
-exports.uploadAvatar = async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Please upload an image file' });
-    }
-
-    // FIXED: Removed the optional chaining (?.)
     const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
 
     if (!userId) {
@@ -88,10 +92,41 @@ exports.uploadAvatar = async (req, res, next) => {
         .status(400)
         .json({ success: false, message: 'User ID is required' });
     }
+    const { linkId } = req.params;
+    const updatedUser = await profileService.removeSocialLink(userId, linkId);
 
-    const updatedUser = await profileService.updateProfileImage(
+    res.status(200).json({
+      status: 'success',
+      message: 'Social link removed successfully',
+      data: { socialLinks: updatedUser.socialLinks },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.uploadProfileImages = async (req, res, next) => {
+  try {
+    // 1. Check if ANY files were uploaded at all
+    if (!req.files || Object.keys(req.files).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload at least one image (avatar or cover)',
+      });
+    }
+
+    const userId = (req.user && req.user.id) || req.user._id;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
+
+    // 2. Pass the entire req.files object to the service!
+    const updatedUser = await profileService.updateProfileImages(
       userId,
-      'avatar'
+      req.files
     );
 
     res.status(200).json({
@@ -108,10 +143,16 @@ exports.uploadAvatar = async (req, res, next) => {
 // ==========================================
 exports.updateTier = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
+    }
     const { role } = req.body;
 
-    const updatedUser = await profileService.updateTier(id, role);
+    const updatedUser = await profileService.updateTier(userId, role);
 
     res.status(200).json({
       status: 'success',
