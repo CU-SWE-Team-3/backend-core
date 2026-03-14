@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 
@@ -21,5 +22,7 @@ app.get('/', (req, res) => {
     message: 'BioBeats API is running!',
   });
 });
+
+app.use('/api/v1/profiles', profileRoutes);
 
 module.exports = app;
