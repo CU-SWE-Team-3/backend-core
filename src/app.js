@@ -2,24 +2,77 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
+const cookieParser = require('cookie-parser');
+
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
-// Global Middlewares
+// ==========================================
+// 1. GLOBAL MIDDLEWARES & SECURITY
+// ==========================================
+// Set security HTTP headers
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
-console.log(process.env.NODE_ENV);
 
+// Enable CORS (Cross-Origin Resource Sharing)
+app.use(
+  cors({
+    origin: 'http://localhost:3000', // Your frontend URL
+    credentials: true, // THIS IS THE KEY: Allows cookies to be sent/received
+  })
+);
+
+// Development logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
-// Health-Check Route
+
+// Limit requests from same IP (Brute Force Protection)
+const limiter = rateLimit({
+  max: 100,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  message: 'Too many requests from this IP, please try again in an hour!',
+});
+app.use('/api', limiter);
+
+// Body parser, reading data from body into req.body (Prevents large payload attacks)
+app.use(express.json({ limit: '10kb' }));
+app.use(cookieParser()); // <--- NEW: Allows Express to read incoming cookies
+
+app.use((req, res, next) => {
+  Object.defineProperty(req, 'query', {
+    value: { ...req.query },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+  next();
+});
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Prevent parameter pollution
+app.use(
+  hpp({
+    whitelist: [
+      // We will add sort/filter fields here later (e.g., 'genre', 'duration')
+    ],
+  })
+);
+
+// ==========================================
+// 2. ROUTES
+// ==========================================
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'BioBeats API is running!',
+    message: 'BioBeats API is highly secure and running!',
   });
 });
+
+app.use('/api/auth', authRoutes);
 
 module.exports = app;
