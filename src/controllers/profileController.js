@@ -34,6 +34,11 @@ exports.updateSocialLinks = async (req, res, next) => {
       status: 'success',
       message: 'Social links updated successfully',
       data: { socialLinks: updatedUser.socialLinks },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.updateProfile = async (req, res, next) => {
   try {
@@ -72,6 +77,12 @@ exports.removeSocialLink = async (req, res, next) => {
       status: 'success',
       message: 'Social link removed successfully',
       data: { socialLinks: updatedUser.socialLinks },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+      
 exports.uploadAvatar = async (req, res, next) => {
   try {
     if (!req.file) {
