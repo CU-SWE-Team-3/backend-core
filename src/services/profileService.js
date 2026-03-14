@@ -1,7 +1,47 @@
-// src/services/profileService.js
-const User = require('../models/userModel');
+const User = require('../models/userModel'); // Ensure this points to the merged model
 
-const updateProfileData = async (userId, updateData) => {
+exports.updatePrivacy = async (userId, isPrivate) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { isPrivate },
+    { new: true, runValidators: true, select: '-password' } // Exclude sensitive info
+  );
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+exports.updateSocialLinks = async (userId, socialLinks) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { socialLinks },
+    { new: true, runValidators: true, select: '-password' }
+  );
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+exports.removeSocialLink = async (userId, linkId) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $pull: { socialLinks: { _id: linkId } } },
+    { new: true, select: '-password' }
+  );
+
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+exports.updateTier = async (userId, role) => {
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { role },
+    { new: true, runValidators: true, select: '-password' }
+  );
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+exports.updateProfileData = async (userId, updateData) => {
   // Only allow updating specific fields to prevent security risks
   const allowedUpdates = {
     bio: updateData.bio,
@@ -25,7 +65,7 @@ const updateProfileData = async (userId, updateData) => {
 };
 
 // Removed fileBuffer parameter here to fix the ESLint error!
-const updateProfileImage = async (userId, imageType) => {
+exports.updateProfileImage = async (userId, imageType) => {
   // Mocking the image URL since we don't have Cloudinary set up yet
   const mockImageUrl = `https://biobeats-assets.com/${imageType}-${Date.now()}.png`;
 
@@ -36,5 +76,3 @@ const updateProfileImage = async (userId, imageType) => {
 
   return User.findByIdAndUpdate(userId, { $set: updateField }, { new: true });
 };
-
-module.exports = { updateProfileData, updateProfileImage };

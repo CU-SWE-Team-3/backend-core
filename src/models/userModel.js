@@ -60,12 +60,23 @@ const userSchema = new mongoose.Schema(
     },
     country: { type: String, default: '' },
     city: { type: String, default: '' },
-    genres: [{ type: String, trim: true }], // Merged from favoriteGenres
+    genres: [{ type: String, trim: true }],
+
     socialLinks: {
-      instagram: { type: String, default: '' },
-      twitter: { type: String, default: '' },
-      website: { type: String, default: '' },
+      type: [
+        {
+          platform: { type: String, required: true },
+          url: { type: String, required: true },
+        },
+      ],
+      validate: [
+        function (links) {
+          return links.length <= 10; // Enforces the exact SoundCloud limit!
+        },
+        'You can only add up to 10 web links.',
+      ],
     },
+
     avatarUrl: {
       type: String,
       default: 'default-avatar.png',
