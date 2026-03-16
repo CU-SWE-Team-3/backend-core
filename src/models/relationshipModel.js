@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const relationshipSchema = new mongoose.Schema(
+const followSchema = new mongoose.Schema(
   {
     follower: {
       type: mongoose.Schema.Types.ObjectId,
@@ -17,6 +17,6 @@ const relationshipSchema = new mongoose.Schema(
 );
 
 // Prevent duplicate follows: A user can only follow another user once
-relationshipSchema.index({ follower: 1, following: 1 }, { unique: true });
+followSchema.index({ follower: 1, following: 1 }, { unique: true });
 
-module.exports = mongoose.model('Relationship', relationshipSchema);
+module.exports = mongoose.model('Follow', followSchema);
