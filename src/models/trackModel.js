@@ -1,18 +1,28 @@
 const mongoose = require('mongoose');
 
+const slug = require('mongoose-slug-updater');
+
+mongoose.plugin(slug);
+
 const trackSchema = new mongoose.Schema(
   {
-    // --- BE-3 METADATA (Visuals & Info) ---
+    // ==========================================
+    // BE-3: METADATA ENGINE & VISUALS
+    // ==========================================
     title: {
       type: String,
       required: [true, 'A track must have a title'],
       trim: true,
-      maxlength: [100, 'Title cannot be more than 100 characters'],
+      maxlength: [100, 'Title cannot exceed 100 characters'],
     },
     permalink: {
       type: String,
       unique: true,
-      sparse: true, // Will be generated from title + user ID
+      sparse: true,
+      trim: true,
+      slug: 'title', // <--- 3. THIS IS THE MAGIC LINE!
+      slugPaddingSize: 1,
+      index: true, // Add an index for faster lookups by permalink
     },
     artist: {
       type: mongoose.Schema.ObjectId,
@@ -28,12 +38,32 @@ const trackSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    tags: [String],
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    releaseDate: {
+      type: Date,
+      default: Date.now,
+    },
     artworkUrl: {
       type: String,
-      default: 'default-track-artwork.png',
+      default: 'default-track-artwork.png', // Will be replaced by your Azure Blob URL
     },
 
+    // ==========================================
+    // BE-3: TRACK VISIBILITY
+    // ==========================================
+    isPublic: {
+      type: Boolean,
+      default: true, // true = Public (searchable), false = Private (link-only)
+    },
+
+    // ==========================================
+    // BE-2: AUDIO PIPELINE (Placeholders)
+    // ==========================================
     // --- BE-2 CORE AUDIO INFRASTRUCTURE (Your Domain) ---
     audioUrl: {
       type: String,
