@@ -7,8 +7,10 @@ const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
-const authRoutes = require('./routes/authRoutes');
 
+const trackRoutes = require('./routes/trackRoutes');
+const authRoutes = require('./routes/authRoutes');
+const trackRoutes = require('./routes/trackRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
@@ -45,8 +47,12 @@ app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser()); // <--- NEW: Allows Express to read incoming cookies
 
 app.use((req, res, next) => {
+  const queryClone = {};
+  Object.keys(req.query || {}).forEach((key) => {
+    queryClone[key] = req.query[key];
+  });
   Object.defineProperty(req, 'query', {
-    value: { ...req.query },
+    value: queryClone,
     writable: true,
     configurable: true,
     enumerable: true,
@@ -81,4 +87,5 @@ app.use('/api/profile', profileRoutes);
 
 app.use('/api/network', networkRoutes);
 
+app.use('/api/tracks', trackRoutes);
 module.exports = app;
