@@ -1,11 +1,11 @@
-const Track = require('../models/trackModel');
-const { uploadImageToAzure } = require('../utils/azureStorage');
 const {
   BlobServiceClient,
   generateBlobSASQueryParameters,
   BlobSASPermissions,
   StorageSharedKeyCredential,
 } = require('@azure/storage-blob');
+const Track = require('../models/trackModel');
+const { uploadImageToAzure } = require('../utils/azureStorage');
 const { publishToQueue } = require('../utils/queueProducer');
 // ==========================================
 // BE-3: METADATA & VISIBILITY LOGIC
@@ -40,10 +40,10 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
   // 2. Use findOneAndUpdate exactly like the User Profile service!
   // This does three things at once:
   // - Finds the track by its ID
-  // - Verifies ownership in the same query ({ user: userId })
+  // - Verifies ownership in the same query ({ artist: userId })
   // - TRIGGERS THE SLUG PLUGIN AUTOMATICALLY!
   const track = await Track.findOneAndUpdate(
-    { _id: trackId, user: userId },
+    { _id: trackId, artist: userId },
     { $set: allowedUpdates },
     { new: true, runValidators: true }
   );
@@ -65,7 +65,7 @@ exports.toggleTrackVisibility = async (trackId, userId, isPublic) => {
     throw new Error('Track not found');
   }
 
-  if (track.user.toString() !== userId.toString()) {
+  if (track.artist.toString() !== userId.toString()) {
     throw new Error('You do not have permission to edit this track');
   }
 
@@ -85,7 +85,7 @@ exports.updateTrackArtwork = async (trackId, userId, file) => {
     throw new Error('Track not found');
   }
 
-  if (track.user.toString() !== userId.toString()) {
+  if (track.artist.toString() !== userId.toString()) {
     throw new Error('You do not have permission to edit this track');
   }
 
@@ -101,8 +101,7 @@ exports.updateTrackArtwork = async (trackId, userId, file) => {
   await track.save();
 
   return track;
-}
-
+};
 
 // 1. GENERATE SAS TOKEN & CHECK LIMITS
 exports.generateUploadUrl = async (user, trackData) => {
