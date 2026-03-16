@@ -8,7 +8,7 @@ const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/authRoutes');
-
+const trackRoutes = require('./routes/trackRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
@@ -78,5 +78,5 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 
 app.use('/api/profile', profileRoutes);
-
+app.use('/api/tracks', trackRoutes);
 module.exports = app;

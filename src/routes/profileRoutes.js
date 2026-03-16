@@ -5,7 +5,6 @@ const { protect } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-// Route: /api/v1/profiles
 router.patch('/privacy', protect, profileController.updatePrivacy);
 router.patch('/social-links', protect, profileController.updateSocialLinks);
 router.delete(
@@ -15,7 +14,7 @@ router.delete(
 );
 router.patch('/tier', protect, profileController.updateTier);
 
-// 2. Local Files Second
+router.get('/:permalink', profileController.getProfileByPermalink);
 router.patch('/update', protect, profileController.updateProfile);
 
 // Avatar Upload Route (protect goes first, then multer upload, then controller)
