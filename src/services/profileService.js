@@ -1,6 +1,21 @@
 const User = require('../models/userModel'); // Ensure this points to the merged model
 const { uploadImageToAzure } = require('../utils/azureStorage');
 
+exports.getProfileByPermalink = async (permalink) => {
+  const user = await User.findOne({ permalink }).select(
+    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink'
+  );
+
+  if (!user) {
+    throw new Error('Profile not found.');
+  }
+  if (user.isPrivate) {
+    throw new Error('This account is private.');
+  }
+
+  return user;
+};
+
 exports.updatePrivacy = async (userId, isPrivate) => {
   const user = await User.findByIdAndUpdate(
     userId,

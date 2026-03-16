@@ -163,3 +163,26 @@ exports.updateTier = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getProfileByPermalink = async (req, res) => {
+  try {
+    const { permalink } = req.params;
+
+    // Ask the service to get the data
+    const user = await profileService.getProfileByPermalink(permalink);
+
+    // Send the success response
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    // If the service threw the "Profile not found" error, return a 404. Otherwise, 500.
+    const statusCode = error.message === 'Profile not found.' ? 404 : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
