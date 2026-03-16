@@ -79,4 +79,6 @@ app.use('/api/auth', authRoutes);
 
 app.use('/api/profile', profileRoutes);
 
+app.use('/api/network', require('./routes/networkRoutes'));
+
 module.exports = app;
