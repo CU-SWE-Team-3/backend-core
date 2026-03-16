@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
-const relationshipRoutes = require('./routes/relationshipRoutes');
+const networkRoutes = require('./routes/networkRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const profileRoutes = require('./routes/profileRoutes');
@@ -77,7 +77,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 // This means all relationship routes will start with /api/users
-app.use('/api/users', relationshipRoutes);
+app.use('/api/network', networkRoutes);
 
 app.use('/api/profile', profileRoutes);
 
