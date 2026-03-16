@@ -47,18 +47,6 @@ const unfollowUser = async (followerId, followingId) => {
   return { message: 'Unfollowed successfully' };
 };
 
-const getUserFollowers = async (userId) => {
-  const follows = await Follow.find({ following: userId })
-    .populate('follower', '_id displayName avatarUrl permalink role'); 
-  return follows.map(rel => rel.follower);
-};
-
-const getUserFollowing = async (userId) => {
-  const follows = await Follow.find({ follower: userId })
-    .populate('following', '_id displayName avatarUrl permalink role');
-  return followa.map(rel => rel.following);
-};
-
 
 // auomatically generate feed for user based on who they follow
 const getUserFeed = async (userId) => {
