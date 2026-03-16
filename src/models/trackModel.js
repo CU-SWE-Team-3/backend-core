@@ -22,6 +22,7 @@ const trackSchema = new mongoose.Schema(
       trim: true,
       slug: 'title', // <--- 3. THIS IS THE MAGIC LINE!
       slugPaddingSize: 1,
+      index: true, // Add an index for faster lookups by permalink
     },
     description: {
       type: String,
