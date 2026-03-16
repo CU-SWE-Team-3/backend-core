@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@azure/storage-blob": "^12.31.0",
     "axios": "^1.13.6",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -30,7 +31,8 @@
     "mongoose-slug-updater": "^3.3.0",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.2"
+    "nodemailer": "^8.0.2",
+    "slugify": "^1.6.8"
   },
   "devDependencies": {
     "eslint": "^8.57.1",

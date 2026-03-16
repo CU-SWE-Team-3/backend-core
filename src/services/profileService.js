@@ -1,4 +1,5 @@
 const User = require('../models/userModel'); // Ensure this points to the merged model
+const { uploadImageToAzure } = require('../utils/azureStorage');
 
 exports.updatePrivacy = async (userId, isPrivate) => {
   const user = await User.findByIdAndUpdate(
@@ -65,25 +66,43 @@ exports.updateProfileData = async (userId, updateData) => {
 };
 
 // Removed fileBuffer parameter here to fix the ESLint error!
+// Upgraded to use real Azure Blob Storage!
 exports.updateProfileImages = async (userId, uploadedFiles) => {
-  // 1. Create an empty object to hold our dynamic updates
   const updateFields = {};
 
-  // 2. Did they upload an avatar? If yes, generate the URL and add it to the object.
-  if (uploadedFiles.avatar) {
-    updateFields.avatarUrl = `https://biobeats-assets.com/avatar-${Date.now()}.png`;
+  // 1. Did they upload an avatar?
+  if (uploadedFiles.avatar && uploadedFiles.avatar[0]) {
+    const file = uploadedFiles.avatar[0];
+    // We pass 'avatars' as the folder name so Azure keeps it organized!
+    const azureUrl = await uploadImageToAzure(
+      file.buffer,
+      file.mimetype,
+      'avatars'
+    );
+    updateFields.avatarUrl = azureUrl;
   }
 
-  // 3. Did they upload a cover? If yes, generate the URL and add it to the object.
-  if (uploadedFiles.cover) {
-    updateFields.coverUrl = `https://biobeats-assets.com/cover-${Date.now()}.png`;
+  // 2. Did they upload a cover photo?
+  if (uploadedFiles.cover && uploadedFiles.cover[0]) {
+    const file = uploadedFiles.cover[0];
+    // We pass 'covers' as the folder name!
+    const azureUrl = await uploadImageToAzure(
+      file.buffer,
+      file.mimetype,
+      'covers'
+    );
+    updateFields.coverUrl = azureUrl;
   }
 
-  // 4. Safety check: If they somehow bypassed the controller check, don't crash the DB
+  // 3. Safety check
   if (Object.keys(updateFields).length === 0) {
     throw new Error('No valid image fields provided');
   }
 
-  // 5. Execute a SINGLE database update with whatever is inside updateFields
-  return User.findByIdAndUpdate(userId, { $set: updateFields }, { new: true });
+  // 4. Update the database with the real Azure URLs
+  return User.findByIdAndUpdate(
+    userId,
+    { $set: updateFields },
+    { new: true, select: '-password' }
+  );
 };
