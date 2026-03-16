@@ -82,6 +82,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+// This means all relationship routes will start with /api/users
+app.use('/api/network', networkRoutes);
 
 app.use('/api/profile', profileRoutes);
 

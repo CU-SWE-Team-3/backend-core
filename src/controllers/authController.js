@@ -154,11 +154,11 @@ exports.login = async (req, res) => {
 // UPDATED: Extracts and passes captchaToken
 exports.register = async (req, res) => {
   try {
-    const { email, password, age, displayName, gender, captchaToken } =
+    const { email, password, age, displayName, gender, captchaToken  } =
       req.body;
     const { user } = await authService.registerUser(
       { email, password, age, displayName, gender },
-      captchaToken
+      captchaToken 
     );
     res.status(201).json({
       _id: user._id,
