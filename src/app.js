@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
+const networkRoutes = require('./routes/networkRoutes');
 
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -83,5 +84,8 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 
 app.use('/api/profile', profileRoutes);
+
+app.use('/api/network', networkRoutes);
+
 app.use('/api/tracks', trackRoutes);
 module.exports = app;
