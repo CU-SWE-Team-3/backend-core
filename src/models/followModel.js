@@ -6,11 +6,13 @@ const followSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true, // Speeds up queries for "Who is this person following?"
     },
     following: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true, // Speeds up queries for "Who are this person's followers?"
     },
   },
   { timestamps: true }

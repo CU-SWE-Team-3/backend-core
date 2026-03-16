@@ -156,7 +156,7 @@ exports.register = async (req, res) => {
   try {
     const { email, password, age, displayName, gender, captchaToken  } =
       req.body;
-    const { user, verificationToken } = await authService.registerUser(
+    const { user } = await authService.registerUser(
       { email, password, age, displayName, gender },
       captchaToken 
     );
@@ -194,7 +194,7 @@ exports.verifyEmail = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const { resetToken } = await authService.generatePasswordReset(email);
+    await authService.generatePasswordReset(email);
     res.status(200).json({
       success: true,
       message: 'If an account exists, a reset link has been sent.',

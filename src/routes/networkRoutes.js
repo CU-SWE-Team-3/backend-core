@@ -6,20 +6,26 @@ const { protect } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-// 🔒 Apply the protect middleware to all routes below this line
-// ... existing imports
+
+router.get('/:userId/followers', networkController.getFollowers);
+router.get('/:userId/following', networkController.getFollowing);
 router.use(protect);
 
-// GET: /api/users/feed -> Real-time social activity feed
 router.get('/feed', networkController.getFeed);
 
-// Existing follow/unfollow routes below...
-
-// POST: /api/users/:id/follow -> Follow a user
 router.post('/:id/follow', networkController.followUser);
 
 // DELETE: /api/users/:id/unfollow -> Unfollow a user
 router.delete('/:id/unfollow', networkController.unfollowUser);
 
+
+router.get('/suggested', networkController.getSuggestedUsers);
+router.get('/blocked-users', networkController.getBlockedUsers);
+
+// ==========================================
+// 3.(Block / Unblock)
+// ==========================================
+router.post('/:userId/block', networkController.blockUser);
+router.delete('/:userId/block', networkController.unblockUser);
 
 module.exports = router;
