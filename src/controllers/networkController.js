@@ -76,40 +76,6 @@ exports.getBlockedUsers = async (req, res, next) => {
 // New Separate Controllers
 // ==========================================
 
-exports.followUser = async (req, res, next) => {
-  try {
-    const followerId = req.user.id;
-    const { userId: followingId } = req.params;
-
-    const result = await networkService.followUser(followerId, followingId);
-
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'User followed successfully',
-    });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
-exports.unfollowUser = async (req, res, next) => {
-  try {
-    const followerId = req.user.id;
-    const { userId: followingId } = req.params;
-
-    const result = await networkService.unfollowUser(followerId, followingId);
-
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'User unfollowed successfully',
-    });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
 exports.blockUser = async (req, res, next) => {
   try {
     const blockerId = req.user.id;
