@@ -1,4 +1,4 @@
-const Relationship = require('../models/relationshipModel');
+const Follow = require('../models/followModel');
 const User = require('../models/userModel');
 
 const followUser = async (followerId, followingId) => {
@@ -11,7 +11,7 @@ const followUser = async (followerId, followingId) => {
     throw new Error('User not found.');
   }
 
-  const existingFollow = await Relationship.findOne({
+  const existingFollow = await Follow.findOne({
     follower: followerId,
     following: followingId,
   });
@@ -20,7 +20,7 @@ const followUser = async (followerId, followingId) => {
     throw new Error('You are already following this user.');
   }
 
-  const relationship = await Relationship.create({
+  const follow = await Follow.create({
     follower: followerId,
     following: followingId,
   });
@@ -28,16 +28,16 @@ const followUser = async (followerId, followingId) => {
   await User.findByIdAndUpdate(followerId, { $inc: { followingCount: 1 } });
   await User.findByIdAndUpdate(followingId, { $inc: { followerCount: 1 } });
 
-  return relationship;
+  return follow;
 };
 
 const unfollowUser = async (followerId, followingId) => {
-  const relationship = await Relationship.findOneAndDelete({
+  const follow = await Follow.findOneAndDelete({
     follower: followerId,
     following: followingId,
   });
 
-  if (!relationship) {
+  if (!follow) {
     throw new Error('You are not following this user.');
   }
 
@@ -48,22 +48,22 @@ const unfollowUser = async (followerId, followingId) => {
 };
 
 const getUserFollowers = async (userId) => {
-  const relationships = await Relationship.find({ following: userId })
+  const follows = await Follow.find({ following: userId })
     .populate('follower', '_id displayName avatarUrl permalink role'); 
-  return relationships.map(rel => rel.follower);
+  return follows.map(rel => rel.follower);
 };
 
 const getUserFollowing = async (userId) => {
-  const relationships = await Relationship.find({ follower: userId })
+  const follows = await Follow.find({ follower: userId })
     .populate('following', '_id displayName avatarUrl permalink role');
-  return relationships.map(rel => rel.following);
+  return followa.map(rel => rel.following);
 };
 
 
 // auomatically generate feed for user based on who they follow
 const getUserFeed = async (userId) => {
   // 1. Find the IDs of everyone the user follows
-  const followingRels = await Relationship.find({ follower: userId });
+  const followingRels = await Follow.find({ follower: userId });
   const followingIds = followingRels.map(rel => rel.following);
 
   if (followingIds.length === 0) {
