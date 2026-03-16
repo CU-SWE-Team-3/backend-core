@@ -10,7 +10,6 @@ const networkRoutes = require('./routes/networkRoutes');
 
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
-const trackRoutes = require('./routes/trackRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();

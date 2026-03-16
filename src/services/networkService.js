@@ -48,12 +48,11 @@ exports.unfollowUser = async (followerId, followingId) => {
   return { message: 'Unfollowed successfully' };
 };
 
-
 // auomatically generate feed for user based on who they follow
 exports.getUserFeed = async (userId) => {
   // 1. Find the IDs of everyone the user follows
   const followingRels = await Follow.find({ follower: userId });
-  const followingIds = followingRels.map(rel => rel.following);
+  const followingIds = followingRels.map((rel) => rel.following);
 
   if (followingIds.length === 0) {
     return []; // Return empty if following no one
@@ -67,7 +66,6 @@ exports.getUserFeed = async (userId) => {
 
   return feed;
 };
-
 
 exports.getFollowers = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
@@ -127,8 +125,8 @@ exports.getSuggestedUsers = async (currentUserId, page = 1, limit = 10) => {
         },
       },
       { $sort: { mutualCount: -1 } },
-      { $skip: skip }, 
-      { $limit: parseInt(limit) },
+      { $skip: skip },
+      { $limit: parseInt(limit, 10) },
     ]);
 
     if (mutualFollows.length > 0) {
@@ -155,7 +153,7 @@ exports.getSuggestedUsers = async (currentUserId, page = 1, limit = 10) => {
     })
       .select('displayName permalink avatarUrl followerCount role')
       .sort({ followerCount: -1 })
-      .skip(skip) 
+      .skip(skip)
       .limit(remainingLimit);
 
     suggestedUsers = [...suggestedUsers, ...popularUsers];
@@ -175,7 +173,6 @@ exports.getBlockedUsers = async (userId) => {
 // ==========================================
 // New Separate Actions (Block/Unblock)
 // ==========================================
-
 
 exports.blockUser = async (blockerId, blockedId) => {
   if (blockerId.toString() === blockedId.toString()) {
