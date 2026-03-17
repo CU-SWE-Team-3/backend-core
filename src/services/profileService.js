@@ -3,14 +3,25 @@ const { uploadImageToAzure } = require('../utils/azureStorage');
 
 exports.getProfileByPermalink = async (permalink) => {
   const user = await User.findOne({ permalink }).select(
-    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink'
+    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink isPrivate'
   );
 
   if (!user) {
-    throw new Error('Profile not found.');
+    // Throw with a code the controller can read
+    const err = new Error('Profile not found.');
+    err.statusCode = 404;
+    throw err;
   }
+
   if (user.isPrivate) {
-    throw new Error('This account is private.');
+    // Return limited public info instead of throwing — cleaner UX
+    // The frontend knows the profile exists but can't see the details
+    return {
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      permalink: user.permalink,
+      isPrivate: true,
+    };
   }
 
   return user;

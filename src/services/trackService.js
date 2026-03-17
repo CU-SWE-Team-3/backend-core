@@ -117,8 +117,17 @@ exports.generateUploadUrl = async (user, trackData) => {
     }
   }
 
-  if (!format || !format.startsWith('audio/')) {
-    throw new Error('Invalid format. Must be an audio file type.');
+  const ALLOWED_FORMATS = [
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/wave',
+  ];
+  if (!format || !ALLOWED_FORMATS.includes(format)) {
+    throw new Error(
+      `Unsupported format "${format}". Accepted formats: MP3 (audio/mpeg) and WAV (audio/wav).`
+    );
   }
 
   const accountName = process.env.AZURE_ACCOUNT_NAME;

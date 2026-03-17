@@ -167,19 +167,24 @@ exports.updateTier = async (req, res, next) => {
 exports.getProfileByPermalink = async (req, res) => {
   try {
     const { permalink } = req.params;
-
-    // Ask the service to get the data
     const user = await profileService.getProfileByPermalink(permalink);
 
-    // Send the success response
+    // Private profiles return a 200 with limited data + isPrivate flag
+    // This is better than a 403 because it tells the client "it exists, just locked"
+    if (user.isPrivate) {
+      return res.status(200).json({
+        success: true,
+        isPrivate: true,
+        data: user,
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: user,
     });
   } catch (error) {
-    // If the service threw the "Profile not found" error, return a 404. Otherwise, 500.
-    const statusCode = error.message === 'Profile not found.' ? 404 : 500;
-
+    const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       success: false,
       error: error.message,

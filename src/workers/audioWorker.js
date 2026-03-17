@@ -10,6 +10,10 @@ const Track = require('../models/trackModel');
 
 // 1. Connect to Database (Worker needs its own connection)
 
+if (!global.crypto) {
+  global.crypto = require('node:crypto').webcrypto;
+}
+
 mongoose
   .connect(
     process.env.DATABASE.replace('<db_password>', process.env.DATABASE_PASSWORD)
@@ -32,11 +36,16 @@ const startWorker = async () => {
         console.log(`\n📥 [Worker] Processing Track ID: ${ticket.trackId}`);
 
         // Setup temporary folders for processing
-        const tempDir = path.join(__dirname, '../../temp_audio');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-        const inputPath = path.join(tempDir, `${ticket.trackId}_input.mp3`);
-        const outputDir = path.join(tempDir, `${ticket.trackId}_hls`);
-        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+        const tempDir = path.join(
+          __dirname,
+          '../../temp_audio',
+          ticket.trackId
+        );
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const inputPath = path.join(tempDir, 'input.mp3');
+        const outputDir = path.join(tempDir, 'hls');
+        if (!fs.existsSync(outputDir))
+          fs.mkdirSync(outputDir, { recursive: true });
         try {
           // Initialize Azure Client once to use for both Download and Upload!
           const blobServiceClient = BlobServiceClient.fromConnectionString(
