@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon server.js",
+    "start": "concurrently \"node server.js\" \"node src/workers/audioWorker.js\"",
+    "dev": "concurrently \"nodemon server.js\" \"nodemon src/workers/audioWorker.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -18,6 +19,7 @@
     "amqplib": "^0.10.9",
     "axios": "^1.13.6",
     "bcrypt": "^6.0.0",
+    "concurrently": "^9.2.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

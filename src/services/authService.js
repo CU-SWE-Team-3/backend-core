@@ -117,7 +117,7 @@ const registerUser = async (userData, captchaToken) => {
     emailVerificationToken: verificationToken,
   });
 
-  const verificationUrl = `http://localhost:5000/api/auth/verify-email?token=${verificationToken}`;
+  const verificationUrl = `http://${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
   const message = `Welcome to BioBeats, ${user.displayName}!\n\nPlease verify your account by clicking the link below:\n\n${verificationUrl}\n\nIf you did not request this, please ignore this email.`;
 
   try {
@@ -191,6 +191,67 @@ const logoutUser = async (userId) => {
   return true;
 };
 
+const resendVerificationEmail = async (email) => {
+  const user = await User.findOne({ email });
+
+  // Silently return if user not found or already verified
+  // (prevents email enumeration)
+  if (!user || user.isEmailVerified) return;
+
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+  user.emailVerificationToken = verificationToken;
+  await user.save();
+
+  const verificationUrl = `http://${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
+  const message = `Hi ${user.displayName},\n\nHere is your new verification link:\n\n${verificationUrl}\n\nThis link does not expire automatically — request a new one if needed.`;
+
+  await sendEmail({
+    email: user.email,
+    subject: 'BioBeats — New Verification Link',
+    message,
+  });
+};
+
+const requestEmailUpdate = async (userId, newEmail) => {
+  // 1. Check the new email isn't already taken
+  const existing = await User.findOne({ email: newEmail });
+  if (existing) throw new Error('That email address is already registered.');
+
+  const user = await User.findById(userId);
+  if (!user) throw new Error('User not found.');
+
+  // 2. Generate a token and temporarily store the pending new email
+  const token = crypto.randomBytes(20).toString('hex');
+  user.pendingEmail = newEmail; // <-- add this field to userModel
+  user.pendingEmailToken = token; // <-- add this field to userModel
+  await user.save();
+
+  // 3. Send the verification link to the NEW address (not the current one)
+  const confirmUrl = `http://${process.env.FRONTEND_URL}/api/auth/confirm-email-update?token=${token}`;
+  const message = `Hi ${user.displayName},\n\nClick the link below to confirm your new email address:\n\n${confirmUrl}\n\nIf you did not request this, you can ignore this email.`;
+
+  await sendEmail({
+    email: newEmail, // send to the NEW address, not current
+    subject: 'BioBeats — Confirm Your New Email',
+    message,
+  });
+};
+
+// Fix 3: Confirm and apply the email change
+const confirmEmailUpdate = async (token) => {
+  const user = await User.findOne({ pendingEmailToken: token });
+  if (!user || !user.pendingEmail) {
+    throw new Error('Invalid or expired email update token.');
+  }
+
+  user.email = user.pendingEmail;
+  user.pendingEmail = undefined;
+  user.pendingEmailToken = undefined;
+  await user.save();
+
+  return user;
+};
+
 module.exports = {
   generateTokens,
   verifyRefreshToken,
@@ -203,4 +264,7 @@ module.exports = {
   resetPassword,
   loginUser,
   logoutUser,
+  resendVerificationEmail,
+  requestEmailUpdate,
+  confirmEmailUpdate,
 };

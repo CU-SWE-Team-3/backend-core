@@ -110,6 +110,8 @@ const userSchema = new mongoose.Schema(
     emailVerificationToken: String,
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    pendingEmail: String,
+    pendingEmailToken: String,
 
     // ==========================================
     // 4. SOCIAL GRAPH COUNTS (Module 3)

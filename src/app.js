@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const hpp = require('hpp');
+// const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
 
@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ==========================================
 // 1. GLOBAL MIDDLEWARES & SECURITY
@@ -23,7 +24,7 @@ app.use(helmet());
 // Enable CORS (Cross-Origin Resource Sharing)
 app.use(
   cors({
-    origin: 'http://localhost:3000', // Your frontend URL
+    origin: `${process.env.FRONTEND_URL}`, // Your frontend URL
     credentials: true, // THIS IS THE KEY: Allows cookies to be sent/received
   })
 );
@@ -62,13 +63,13 @@ app.use((req, res, next) => {
 app.use(mongoSanitize());
 
 // Prevent parameter pollution
-app.use(
-  hpp({
-    whitelist: [
-      // We will add sort/filter fields here later (e.g., 'genre', 'duration')
-    ],
-  })
-);
+// app.use(
+//   hpp({
+//     whitelist: [
+//       // We will add sort/filter fields here later (e.g., 'genre', 'duration')
+//     ],
+//   })
+// );
 
 // ==========================================
 // 2. ROUTES

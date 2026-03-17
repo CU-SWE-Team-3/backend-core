@@ -240,3 +240,64 @@ exports.logout = async (req, res) => {
       .json({ success: false, error: 'Server error during logout' });
   }
 };
+
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email is required' });
+    }
+    await authService.resendVerificationEmail(email);
+    res.status(200).json({
+      success: true,
+      message:
+        'If your account exists and is unverified, a new link has been sent.',
+    });
+  } catch (error) {
+    // Always return 200 to prevent email enumeration attacks
+    res.status(200).json({
+      success: true,
+      message:
+        'If your account exists and is unverified, a new link has been sent.',
+    });
+  }
+};
+
+exports.requestEmailUpdate = async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+    if (!newEmail) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'newEmail is required' });
+    }
+    await authService.requestEmailUpdate(req.user._id, newEmail);
+    res.status(200).json({
+      success: true,
+      message:
+        'Verification email sent to your new address. Confirm it to complete the change.',
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+exports.confirmEmailUpdate = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Token is required' });
+    }
+    await authService.confirmEmailUpdate(token);
+    res.status(200).json({
+      success: true,
+      message: 'Email updated successfully.',
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
