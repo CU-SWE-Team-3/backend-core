@@ -8,30 +8,51 @@ const cookieOptions = {
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
 };
 
+const attachAuthCookies = (res, token, refreshToken) => {
+  res.cookie('accessToken', token, {
+    ...cookieOptions,
+    maxAge: 15 * 60 * 1000,
+  });
+  res.cookie('refreshToken', refreshToken, {
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+};
+
+// Consistent user shape for every auth response
+// Frontend always gets same fields — no second request needed
+const formatUser = (user) => ({
+  _id: user._id,
+  displayName: user.displayName,
+  permalink: user.permalink,
+  avatarUrl: user.avatarUrl,
+  role: user.role,
+  isEmailVerified: user.isEmailVerified,
+  isPremium: user.isPremium,
+  followerCount: user.followerCount,
+  followingCount: user.followingCount,
+});
+
 exports.refreshToken = catchAsync(async (req, res, next) => {
   const refreshToken =
     (req.cookies && req.cookies.refreshToken) ||
     (req.body && req.body.refreshToken);
 
-  if (!refreshToken) {
+  if (!refreshToken)
     return next(new AppError('Refresh token is required', 400));
-  }
 
-  const { token: newAccessToken, refreshToken: newRefreshToken } =
-    await authService.verifyRefreshToken(refreshToken);
+  const {
+    token: newAccessToken,
+    refreshToken: newRefreshToken,
+    user,
+  } = await authService.verifyRefreshToken(refreshToken);
 
-  res.cookie('accessToken', newAccessToken, {
-    ...cookieOptions,
-    maxAge: 15 * 60 * 1000,
-  });
-  res.cookie('refreshToken', newRefreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  attachAuthCookies(res, newAccessToken, newRefreshToken);
 
   res.status(200).json({
     success: true,
     message: 'Tokens refreshed successfully',
+    data: { user: formatUser(user) },
   });
 });
 
@@ -42,21 +63,12 @@ exports.getGoogleAuthUrl = (req, res) => {
 
 exports.handleGoogleCallback = catchAsync(async (req, res, next) => {
   const { code } = req.query;
-  if (!code) {
-    return next(new AppError('Authorization code is missing', 400));
-  }
+  if (!code) return next(new AppError('Authorization code is missing', 400));
 
   const { user, token, refreshToken } =
     await authService.handleGoogleCallback(code);
 
-  res.cookie('accessToken', token, {
-    ...cookieOptions,
-    maxAge: 15 * 60 * 1000,
-  });
-  res.cookie('refreshToken', refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  attachAuthCookies(res, token, refreshToken);
 
   const frontendUrl = `http://localhost:5173/google/callback?permalink=${user.permalink}`;
   res.redirect(frontendUrl);
@@ -64,54 +76,32 @@ exports.handleGoogleCallback = catchAsync(async (req, res, next) => {
 
 exports.loginWithGoogleMobile = catchAsync(async (req, res, next) => {
   const { idToken } = req.body;
-  if (!idToken) {
-    return next(new AppError('idToken is required', 400));
-  }
+  if (!idToken) return next(new AppError('idToken is required', 400));
 
   const { user, token, refreshToken } =
     await authService.handleMobileGoogleLogin(idToken);
 
-  res.cookie('accessToken', token, {
-    ...cookieOptions,
-    maxAge: 15 * 60 * 1000,
+  res.status(200).json({
+    success: true,
+    data: { user: formatUser(user), token, refreshToken },
   });
-  res.cookie('refreshToken', refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  res.status(200).json({ success: true, data: { user, token, refreshToken } });
 });
 
 exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
-  if (!email || !password) {
+  if (!email || !password)
     return next(new AppError('Please provide email and password', 400));
-  }
 
   const user = await authService.loginUser(email, password);
   const { token, refreshToken } = await authService.generateTokens(user);
 
-  res.cookie('accessToken', token, {
-    ...cookieOptions,
-    maxAge: 15 * 60 * 1000,
-  });
-  res.cookie('refreshToken', refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  attachAuthCookies(res, token, refreshToken);
 
   res.status(200).json({
     success: true,
-    user: {
-      _id: user._id,
-      displayName: user.displayName,
-      isEmailVerified: user.isEmailVerified,
-      role: user.role,
-    },
+    data: { user: formatUser(user) },
   });
 });
-
 // UPDATED: Extracts and passes captchaToken
 exports.register = catchAsync(async (req, res) => {
   const { email, password, age, displayName, gender, captchaToken } = req.body;

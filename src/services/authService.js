@@ -31,11 +31,12 @@ const verifyRefreshToken = async (incomingRefreshToken) => {
     );
     const user = await User.findById(decoded.id);
     if (!user || user.refreshToken !== incomingRefreshToken) {
-      throw new AppError('Invalid or revoked refresh token', 401);
+      throw new Error('Invalid or revoked refresh token');
     }
-    return generateTokens(user);
+    const { token, refreshToken } = await generateTokens(user);
+    return { token, refreshToken, user };
   } catch (error) {
-    throw new AppError('Unauthorized', 401);
+    throw new Error('Unauthorized');
   }
 };
 

@@ -11,6 +11,30 @@ const AppError = require('../utils/appError');
  * @route   PATCH /api/tracks/:id/metadata
  * @access  Private (Track Owner)
  */
+
+const formatTrack = (track) => ({
+  _id: track._id,
+  title: track.title,
+  permalink: track.permalink,
+  description: track.description,
+  genre: track.genre,
+  tags: track.tags,
+  releaseDate: track.releaseDate,
+  artworkUrl: track.artworkUrl,
+  hlsUrl: track.hlsUrl,
+  waveform: track.waveform,
+  duration: track.duration,
+  format: track.format,
+  isPublic: track.isPublic,
+  processingState: track.processingState,
+  playCount: track.playCount,
+  likeCount: track.likeCount,
+  repostCount: track.repostCount,
+  commentCount: track.commentCount,
+  artist: track.artist,
+  createdAt: track.createdAt,
+});
+
 exports.updateMetadata = catchAsync(async (req, res) => {
   const trackId = req.params.id;
   const userId = req.user._id || req.user.id;
@@ -92,20 +116,29 @@ exports.initiateUpload = catchAsync(async (req, res) => {
   });
 });
 
-exports.confirmUpload = catchAsync(async (req, res) => {
+exports.confirmUpload = catchAsync(async (req, res, next) => {
   const track = await trackService.confirmUpload(req.params.id, req.user._id);
+
   res.status(200).json({
     success: true,
-    message: 'Track upload confirmed and published.',
-    data: track,
+    message: 'Track upload confirmed. Processing has started.',
+    data: {
+      trackId: track._id,
+      permalink: track.permalink,
+      title: track.title,
+      processingState: track.processingState,
+    },
   });
 });
 
-exports.getTrack = catchAsync(async (req, res) => {
+exports.getTrack = catchAsync(async (req, res, next) => {
   const { permalink } = req.params;
   const track = await trackService.getTrackByPermalink(permalink);
 
-  res.status(200).json({ success: true, data: track });
+  res.status(200).json({
+    success: true,
+    data: { track: formatTrack(track) },
+  });
 });
 
 exports.downloadTrack = catchAsync(async (req, res) => {

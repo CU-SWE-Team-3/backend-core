@@ -204,14 +204,12 @@ exports.confirmUpload = async (trackId, userId) => {
 
 // 3. FETCH SINGLE TRACK (Public streaming)
 exports.getTrackByPermalink = async (permalink) => {
-  // Use findOne to search the database for the matching permalink string
-  const track = await Track.findOne({ permalink: permalink }).populate(
-    'artist',
-    'displayName permalink avatarUrl isPremium'
-  );
+  const track = await Track.findOne({ permalink })
+    .select('-audioUrl')
+    .populate('artist', 'displayName permalink avatarUrl isPremium');
 
   if (!track || track.processingState !== 'Finished') {
-    throw new AppError('Track not found or is still processing.', 404);
+    throw new Error('Track not found or is still processing.');
   }
 
   return track;
