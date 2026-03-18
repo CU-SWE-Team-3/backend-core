@@ -7,16 +7,13 @@ const AppError = require('../utils/appError');
 // ==========================================
 exports.updatePrivacy = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
-
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
+  if (!userId) return next(new AppError('User ID is required', 400));
 
   const { isPrivate } = req.body;
   const updatedUser = await profileService.updatePrivacy(userId, isPrivate);
 
   res.status(200).json({
-    status: 'success',
+    success: true,
     message: 'Privacy settings updated successfully',
     data: { isPrivate: updatedUser.isPrivate },
   });
@@ -27,19 +24,16 @@ exports.updatePrivacy = catchAsync(async (req, res, next) => {
 // ==========================================
 exports.updateSocialLinks = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
+  if (!userId) return next(new AppError('User ID is required', 400));
 
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
   const { socialLinks } = req.body;
-
   const updatedUser = await profileService.updateSocialLinks(
     userId,
     socialLinks
   );
 
   res.status(200).json({
-    status: 'success',
+    success: true,
     message: 'Social links updated successfully',
     data: { socialLinks: updatedUser.socialLinks },
   });
@@ -64,15 +58,13 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
 // ==========================================
 exports.removeSocialLink = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
+  if (!userId) return next(new AppError('User ID is required', 400));
 
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
   const { linkId } = req.params;
   const updatedUser = await profileService.removeSocialLink(userId, linkId);
 
   res.status(200).json({
-    status: 'success',
+    success: true,
     message: 'Social link removed successfully',
     data: { socialLinks: updatedUser.socialLinks },
   });
@@ -107,35 +99,24 @@ exports.uploadProfileImages = catchAsync(async (req, res, next) => {
 // ==========================================
 exports.updateTier = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
+  if (!userId) return next(new AppError('User ID is required', 400));
 
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
   const { role } = req.body;
-
   const updatedUser = await profileService.updateTier(userId, role);
 
   res.status(200).json({
-    status: 'success',
+    success: true,
     message: 'Account tier updated successfully',
     data: { role: updatedUser.role },
   });
 });
 
-exports.getProfileByPermalink = catchAsync(async (req, res) => {
+exports.getProfileByPermalink = catchAsync(async (req, res, next) => {
   const { permalink } = req.params;
   const user = await profileService.getProfileByPermalink(permalink);
 
-  if (user.isPrivate) {
-    return res.status(200).json({
-      success: true,
-      isPrivate: true,
-      data: user,
-    });
-  }
-
   res.status(200).json({
     success: true,
-    data: user,
+    data: { user },
   });
 });

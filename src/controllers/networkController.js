@@ -34,7 +34,7 @@ exports.getFeed = catchAsync(async (req, res) => {
   });
 });
 
-exports.getFollowers = catchAsync(async (req, res) => {
+exports.getFollowers = catchAsync(async (req, res, next) => {
   const { userId } = req.params;
   const { page, limit } = req.query;
   const followers = await networkService.getFollowers(
@@ -42,12 +42,15 @@ exports.getFollowers = catchAsync(async (req, res) => {
     parseInt(page, 10),
     parseInt(limit, 10)
   );
-  res
-    .status(200)
-    .json({ success: true, data: followers, message: 'Followers retrieved' });
+
+  res.status(200).json({
+    success: true,
+    count: followers.length,
+    data: followers,
+  });
 });
 
-exports.getFollowing = catchAsync(async (req, res) => {
+exports.getFollowing = catchAsync(async (req, res, next) => {
   const { userId } = req.params;
   const { page, limit } = req.query;
   const following = await networkService.getFollowing(
@@ -55,12 +58,16 @@ exports.getFollowing = catchAsync(async (req, res) => {
     parseInt(page, 10),
     parseInt(limit, 10)
   );
-  res
-    .status(200)
-    .json({ success: true, data: following, message: 'Following retrieved' });
+
+  res.status(200).json({
+    success: true,
+    count: following.length,
+    data: following,
+  });
 });
 
-exports.getSuggestedUsers = catchAsync(async (req, res) => {
+// FIX: changed results -> count, removed duplicate message field to match other list endpoints
+exports.getSuggestedUsers = catchAsync(async (req, res, next) => {
   const currentUserId = req.user.id;
   const { page = 1, limit = 10 } = req.query;
 
@@ -72,19 +79,19 @@ exports.getSuggestedUsers = catchAsync(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    results: suggested.length,
+    count: suggested.length,
     data: suggested,
-    message: 'Suggested users retrieved',
   });
 });
 
-exports.getBlockedUsers = catchAsync(async (req, res) => {
+exports.getBlockedUsers = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const blockedUsers = await networkService.getBlockedUsers(userId);
+
   res.status(200).json({
     success: true,
+    count: blockedUsers.length,
     data: blockedUsers,
-    message: 'Blocked users retrieved',
   });
 });
 

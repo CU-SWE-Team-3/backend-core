@@ -4,20 +4,21 @@ const AppError = require('../utils/appError');
 
 exports.getProfileByPermalink = async (permalink) => {
   const user = await User.findOne({ permalink }).select(
-    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink isPrivate'
+    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink isPrivate isPremium'
   );
 
   if (!user) {
-    throw new AppError('Profile not found.', 404);
+    const err = new Error('Profile not found.');
+    err.statusCode = 404;
+    throw err;
   }
 
   if (user.isPrivate) {
-    // Return limited public info instead of throwing — cleaner UX
-    // The frontend knows the profile exists but can't see the details
     return {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       permalink: user.permalink,
+      role: user.role,
       isPrivate: true,
     };
   }
@@ -29,9 +30,9 @@ exports.updatePrivacy = async (userId, isPrivate) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { isPrivate },
-    { new: true, runValidators: true, select: '-password' } // Exclude sensitive info
-  );
-  if (!user) throw new AppError('User not found', 404);
+    { new: true, runValidators: true }
+  ).select('isPrivate');
+  if (!user) throw new Error('User not found');
   return user;
 };
 
@@ -39,9 +40,9 @@ exports.updateSocialLinks = async (userId, socialLinks) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { socialLinks },
-    { new: true, runValidators: true, select: '-password' }
-  );
-  if (!user) throw new AppError('User not found', 404);
+    { new: true, runValidators: true }
+  ).select('socialLinks');
+  if (!user) throw new Error('User not found');
   return user;
 };
 
@@ -49,10 +50,9 @@ exports.removeSocialLink = async (userId, linkId) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { $pull: { socialLinks: { _id: linkId } } },
-    { new: true, select: '-password' }
-  );
-
-  if (!user) throw new AppError('User not found', 404);
+    { new: true }
+  ).select('socialLinks');
+  if (!user) throw new Error('User not found');
   return user;
 };
 
@@ -60,9 +60,9 @@ exports.updateTier = async (userId, role) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { role },
-    { new: true, runValidators: true, select: '-password' }
-  );
-  if (!user) throw new AppError('User not found', 404);
+    { new: true, runValidators: true }
+  ).select('role');
+  if (!user) throw new Error('User not found');
   return user;
 };
 
