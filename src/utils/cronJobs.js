@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const Track = require('../models/trackModel');
+const AppError = require('./appError');
 
 const startCronJobs = () => {
   cron.schedule('0 0 * * *', async () => {
@@ -16,7 +17,11 @@ const startCronJobs = () => {
         );
       }
     } catch (error) {
-      console.error('[Cron Error] Failed to clean up tracks:', error);
+      const appError = new AppError(
+        'Failed to clean up abandoned tracks.',
+        500
+      );
+      console.error('[Cron Error]', appError.message, error);
     }
   });
 };

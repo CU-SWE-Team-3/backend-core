@@ -7,6 +7,7 @@ const {
 const Track = require('../models/trackModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 const { publishToQueue } = require('../utils/queueProducer');
+const AppError = require('../utils/appError');
 // ==========================================
 // BE-3: METADATA & VISIBILITY LOGIC
 // ==========================================
@@ -50,7 +51,10 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
 
   // 3. If no track was returned, it either doesn't exist or they don't own it
   if (!track) {
-    throw new Error('Track not found or you do not have permission to edit it');
+    throw new AppError(
+      'Track not found or you do not have permission to edit it',
+      404
+    );
   }
 
   return track;
@@ -62,11 +66,11 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
 exports.toggleTrackVisibility = async (trackId, userId, isPublic) => {
   const track = await Track.findById(trackId);
   if (!track) {
-    throw new Error('Track not found');
+    throw new AppError('Track not found', 404);
   }
 
   if (track.artist.toString() !== userId.toString()) {
-    throw new Error('You do not have permission to edit this track');
+    throw new AppError('You do not have permission to edit this track', 403);
   }
 
   // Update visibility
@@ -82,11 +86,11 @@ exports.updateTrackArtwork = async (trackId, userId, file) => {
   const track = await Track.findById(trackId);
 
   if (!track) {
-    throw new Error('Track not found');
+    throw new AppError('Track not found', 404);
   }
 
   if (track.artist.toString() !== userId.toString()) {
-    throw new Error('You do not have permission to edit this track');
+    throw new AppError('You do not have permission to edit this track', 403);
   }
 
   // Upload the buffer to Azure Blob Storage
@@ -111,8 +115,9 @@ exports.generateUploadUrl = async (user, trackData) => {
   if (!user.isPremium) {
     const trackCount = await Track.countDocuments({ artist: user._id });
     if (trackCount >= 3) {
-      throw new Error(
-        'Upload limit reached. Free accounts are limited to 3 tracks. Please upgrade to Pro.'
+      throw new AppError(
+        'Upload limit reached. Free accounts are limited to 3 tracks. Please upgrade to Pro.',
+        403
       );
     }
   }
@@ -125,8 +130,9 @@ exports.generateUploadUrl = async (user, trackData) => {
     'audio/wave',
   ];
   if (!format || !ALLOWED_FORMATS.includes(format)) {
-    throw new Error(
-      `Unsupported format "${format}". Accepted formats: MP3 (audio/mpeg) and WAV (audio/wav).`
+    throw new AppError(
+      `Unsupported format "${format}". Accepted formats: MP3 (audio/mpeg) and WAV (audio/wav).`,
+      400
     );
   }
 
@@ -175,7 +181,7 @@ exports.generateUploadUrl = async (user, trackData) => {
 exports.confirmUpload = async (trackId, userId) => {
   const track = await Track.findOne({ _id: trackId, artist: userId });
   if (!track) {
-    throw new Error('Track not found.');
+    throw new AppError('Track not found.', 404);
   }
 
   // 1. Instantly update the database status to 'Processing'
@@ -205,7 +211,7 @@ exports.getTrackByPermalink = async (permalink) => {
   );
 
   if (!track || track.processingState !== 'Finished') {
-    throw new Error('Track not found or is still processing.');
+    throw new AppError('Track not found or is still processing.', 404);
   }
 
   return track;
@@ -214,14 +220,15 @@ exports.getTrackByPermalink = async (permalink) => {
 // 4. DOWNLOAD TRACK (Module 12: Premium Offline Listening)
 exports.downloadTrackAudio = async (trackId, user) => {
   if (!user.isPremium) {
-    throw new Error(
-      'Requires Premium Subscription (Go+ or Pro) for offline listening.'
+    throw new AppError(
+      'Requires Premium Subscription (Go+ or Pro) for offline listening.',
+      403
     );
   }
 
   const track = await Track.findById(trackId);
   if (!track || track.processingState !== 'Finished') {
-    throw new Error('Track not found or not ready.');
+    throw new AppError('Track not found or not ready.', 404);
   }
 
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -249,12 +256,15 @@ exports.deleteTrack = async (trackId, userId) => {
   const track = await Track.findById(trackId);
 
   if (!track) {
-    throw new Error('Track not found.');
+    throw new AppError('Track not found.', 404);
   }
 
   // 2. Security Check: Only the owner can delete their track
   if (track.artist.toString() !== userId.toString()) {
-    throw new Error('Unauthorized: You can only delete your own tracks.');
+    throw new AppError(
+      'Unauthorized: You can only delete your own tracks.',
+      403
+    );
   }
 
   // 3. Delete the physical file from Azure Blob Storage

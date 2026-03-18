@@ -12,6 +12,9 @@ const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 
+const globalErrorHandler = require('./middlewares/errorHandler');
+const AppError = require('./utils/appError');
+
 const app = express();
 app.set('trust proxy', 1); // Add this line right after initializing app
 // ==========================================
@@ -36,7 +39,9 @@ if (process.env.NODE_ENV === 'development') {
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-for']) {
     // Takes "41.35.90.44:57064" and turns it into clean "41.35.90.44"
-    req.headers['x-forwarded-for'] = req.headers['x-forwarded-for'].split(',')[0].replace(/:\d+$/, '');
+    req.headers['x-forwarded-for'] = req.headers['x-forwarded-for']
+      .split(',')[0]
+      .replace(/:\d+$/, '');
   }
   next();
 });
@@ -44,7 +49,7 @@ app.use((req, res, next) => {
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests
-  
+
   // COMPLETELY DELETE the `keyGenerator` and `validate` lines!
   // The rate limiter will just use its default, safe IP checker now.
 });
@@ -98,4 +103,18 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/network', networkRoutes);
 
 app.use('/api/tracks', trackRoutes);
+
+// ==========================================
+// 3. UNHANDLED ROUTES (404 catch-all)
+// Must come AFTER all your real routes
+// ==========================================
+app.all('*', (req, res, next) => {
+  next(new AppError(`Route ${req.originalUrl} not found`, 404));
+});
+
+// ==========================================
+// 4. GLOBAL ERROR HANDLER
+// Must be the LAST middleware — Express identifies it by its 4 parameters
+// ==========================================
+app.use(globalErrorHandler);
 module.exports = app;

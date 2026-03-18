@@ -1,5 +1,6 @@
 // src/middlewares/upload.middleware.js
 const multer = require('multer');
+const AppError = require('../utils/appError');
 
 // Storing in memory for now. We can add Cloudinary/S3 later.
 const storage = multer.memoryStorage();
@@ -8,7 +9,7 @@ const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only images are allowed.'), false);
+    cb(new AppError('Invalid file type. Only images are allowed.', 400), false);
   }
 };
 

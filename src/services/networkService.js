@@ -1,15 +1,16 @@
 const Follow = require('../models/followModel');
 const User = require('../models/userModel');
 const Block = require('../models/blockModel');
+const AppError = require('../utils/appError');
 
 exports.followUser = async (followerId, followingId) => {
   if (followerId.toString() === followingId.toString()) {
-    throw new Error('You cannot follow yourself.');
+    throw new AppError('You cannot follow yourself.', 400);
   }
 
   const userToFollow = await User.findById(followingId);
   if (!userToFollow) {
-    throw new Error('User not found.');
+    throw new AppError('User not found.', 404);
   }
 
   const existingFollow = await Follow.findOne({
@@ -18,7 +19,7 @@ exports.followUser = async (followerId, followingId) => {
   });
 
   if (existingFollow) {
-    throw new Error('You are already following this user.');
+    throw new AppError('You are already following this user.', 409);
   }
 
   const follow = await Follow.create({
@@ -39,7 +40,7 @@ exports.unfollowUser = async (followerId, followingId) => {
   });
 
   if (!follow) {
-    throw new Error('You are not following this user.');
+    throw new AppError('You are not following this user.', 400);
   }
 
   await User.findByIdAndUpdate(followerId, { $inc: { followingCount: -1 } });
@@ -176,7 +177,7 @@ exports.getBlockedUsers = async (userId) => {
 
 exports.blockUser = async (blockerId, blockedId) => {
   if (blockerId.toString() === blockedId.toString()) {
-    throw new Error('You cannot block yourself');
+    throw new AppError('You cannot block yourself', 400);
   }
 
   const existingBlock = await Block.findOne({
@@ -185,7 +186,7 @@ exports.blockUser = async (blockerId, blockedId) => {
   });
 
   if (existingBlock) {
-    throw new Error('User is already blocked');
+    throw new AppError('User is already blocked', 409);
   }
 
   await Block.create({ blocker: blockerId, blocked: blockedId });
@@ -208,7 +209,7 @@ exports.unblockUser = async (blockerId, blockedId) => {
   });
 
   if (!existingBlock) {
-    throw new Error('User is not blocked');
+    throw new AppError('User is not blocked', 404);
   }
 
   await Block.findByIdAndDelete(existingBlock._id);

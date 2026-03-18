@@ -1,193 +1,141 @@
 const profileService = require('../services/profileService');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/appError');
 
 // ==========================================
 // 1. Update Privacy
 // ==========================================
-exports.updatePrivacy = async (req, res, next) => {
-  try {
-    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+exports.updatePrivacy = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
 
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
-
-    const { isPrivate } = req.body;
-
-    const updatedUser = await profileService.updatePrivacy(userId, isPrivate);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Privacy settings updated successfully',
-      data: { isPrivate: updatedUser.isPrivate },
-    });
-  } catch (error) {
-    next(error); // Passes to the global error handler in app.js
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
   }
-};
+
+  const { isPrivate } = req.body;
+  const updatedUser = await profileService.updatePrivacy(userId, isPrivate);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Privacy settings updated successfully',
+    data: { isPrivate: updatedUser.isPrivate },
+  });
+});
 
 // ==========================================
 // 2. Update Social Links
 // ==========================================
-exports.updateSocialLinks = async (req, res, next) => {
-  try {
-    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+exports.updateSocialLinks = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
 
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
-    const { socialLinks } = req.body;
-
-    const updatedUser = await profileService.updateSocialLinks(
-      userId,
-      socialLinks
-    );
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Social links updated successfully',
-      data: { socialLinks: updatedUser.socialLinks },
-    });
-  } catch (error) {
-    next(error);
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
   }
-};
+  const { socialLinks } = req.body;
 
-exports.updateProfile = async (req, res, next) => {
-  try {
-    // FIXED: Removed the optional chaining (?.)
-    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+  const updatedUser = await profileService.updateSocialLinks(
+    userId,
+    socialLinks
+  );
 
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
+  res.status(200).json({
+    status: 'success',
+    message: 'Social links updated successfully',
+    data: { socialLinks: updatedUser.socialLinks },
+  });
+});
 
-    const updatedUser = await profileService.updateProfileData(
-      userId,
-      req.body
-    );
+exports.updateProfile = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
 
-    res.status(200).json({
-      success: true,
-      data: updatedUser,
-    });
-  } catch (error) {
-    next(error);
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
   }
-};
+
+  const updatedUser = await profileService.updateProfileData(userId, req.body);
+
+  res.status(200).json({
+    success: true,
+    data: updatedUser,
+  });
+});
 
 // 5. Remove Specific Social Link
 // ==========================================
-exports.removeSocialLink = async (req, res, next) => {
-  try {
-    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+exports.removeSocialLink = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
 
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
-    const { linkId } = req.params;
-    const updatedUser = await profileService.removeSocialLink(userId, linkId);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Social link removed successfully',
-      data: { socialLinks: updatedUser.socialLinks },
-    });
-  } catch (error) {
-    next(error);
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
   }
-};
+  const { linkId } = req.params;
+  const updatedUser = await profileService.removeSocialLink(userId, linkId);
 
-exports.uploadProfileImages = async (req, res, next) => {
-  try {
-    // 1. Check if ANY files were uploaded at all
-    if (!req.files || Object.keys(req.files).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please upload at least one image (avatar or cover)',
-      });
-    }
+  res.status(200).json({
+    status: 'success',
+    message: 'Social link removed successfully',
+    data: { socialLinks: updatedUser.socialLinks },
+  });
+});
 
-    const userId = (req.user && req.user.id) || req.user._id;
-
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
-
-    // 2. Pass the entire req.files object to the service!
-    const updatedUser = await profileService.updateProfileImages(
-      userId,
-      req.files
+exports.uploadProfileImages = catchAsync(async (req, res, next) => {
+  if (!req.files || Object.keys(req.files).length === 0) {
+    return next(
+      new AppError('Please upload at least one image (avatar or cover)', 400)
     );
-
-    res.status(200).json({
-      success: true,
-      data: updatedUser,
-    });
-  } catch (error) {
-    next(error);
   }
-};
+
+  const userId = (req.user && req.user.id) || req.user._id;
+
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
+  }
+
+  const updatedUser = await profileService.updateProfileImages(
+    userId,
+    req.files
+  );
+
+  res.status(200).json({
+    success: true,
+    data: updatedUser,
+  });
+});
 
 // ==========================================
 // 3. Update Tier (Role)
 // ==========================================
-exports.updateTier = async (req, res, next) => {
-  try {
-    const userId = (req.user && req.user.id) || req.user._id; // We get this safely from the verified token!;
+exports.updateTier = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
 
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'User ID is required' });
-    }
-    const { role } = req.body;
-
-    const updatedUser = await profileService.updateTier(userId, role);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Account tier updated successfully',
-      data: { role: updatedUser.role },
-    });
-  } catch (error) {
-    next(error);
+  if (!userId) {
+    return next(new AppError('User ID is required', 400));
   }
-};
+  const { role } = req.body;
 
-exports.getProfileByPermalink = async (req, res) => {
-  try {
-    const { permalink } = req.params;
-    const user = await profileService.getProfileByPermalink(permalink);
+  const updatedUser = await profileService.updateTier(userId, role);
 
-    // Private profiles return a 200 with limited data + isPrivate flag
-    // This is better than a 403 because it tells the client "it exists, just locked"
-    if (user.isPrivate) {
-      return res.status(200).json({
-        success: true,
-        isPrivate: true,
-        data: user,
-      });
-    }
+  res.status(200).json({
+    status: 'success',
+    message: 'Account tier updated successfully',
+    data: { role: updatedUser.role },
+  });
+});
 
-    res.status(200).json({
+exports.getProfileByPermalink = catchAsync(async (req, res) => {
+  const { permalink } = req.params;
+  const user = await profileService.getProfileByPermalink(permalink);
+
+  if (user.isPrivate) {
+    return res.status(200).json({
       success: true,
+      isPrivate: true,
       data: user,
     });
-  } catch (error) {
-    const statusCode = error.statusCode || 500;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message,
-    });
   }
-};
+
+  res.status(200).json({
+    success: true,
+    data: user,
+  });
+});

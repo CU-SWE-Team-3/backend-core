@@ -1,5 +1,6 @@
 const User = require('../models/userModel'); // Ensure this points to the merged model
 const { uploadImageToAzure } = require('../utils/azureStorage');
+const AppError = require('../utils/appError');
 
 exports.getProfileByPermalink = async (permalink) => {
   const user = await User.findOne({ permalink }).select(
@@ -7,10 +8,7 @@ exports.getProfileByPermalink = async (permalink) => {
   );
 
   if (!user) {
-    // Throw with a code the controller can read
-    const err = new Error('Profile not found.');
-    err.statusCode = 404;
-    throw err;
+    throw new AppError('Profile not found.', 404);
   }
 
   if (user.isPrivate) {
@@ -33,7 +31,7 @@ exports.updatePrivacy = async (userId, isPrivate) => {
     { isPrivate },
     { new: true, runValidators: true, select: '-password' } // Exclude sensitive info
   );
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -43,7 +41,7 @@ exports.updateSocialLinks = async (userId, socialLinks) => {
     { socialLinks },
     { new: true, runValidators: true, select: '-password' }
   );
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -54,7 +52,7 @@ exports.removeSocialLink = async (userId, linkId) => {
     { new: true, select: '-password' }
   );
 
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -64,7 +62,7 @@ exports.updateTier = async (userId, role) => {
     { role },
     { new: true, runValidators: true, select: '-password' }
   );
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -122,7 +120,7 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
 
   // 3. Safety check
   if (Object.keys(updateFields).length === 0) {
-    throw new Error('No valid image fields provided');
+    throw new AppError('No valid image fields provided', 400);
   }
 
   // 4. Update the database with the real Azure URLs

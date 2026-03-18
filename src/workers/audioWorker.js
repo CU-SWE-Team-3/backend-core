@@ -7,23 +7,27 @@ const path = require('path');
 const { BlobServiceClient } = require('@azure/storage-blob');
 const { generateRealWaveform } = require('../utils/audioUtils'); // <-- ADD THIS
 const Track = require('../models/trackModel');
-if (!global.crypto) {
-    global.crypto = require('node:crypto').webcrypto;
-}
-console.log("🛠️ Crypto polyfill loaded. Worker ready.");
-
-// 1. Connect to Database (Worker needs its own connection)
-
+const AppError = require('../utils/appError');
 if (!global.crypto) {
   global.crypto = require('node:crypto').webcrypto;
 }
+console.log('🛠️ Crypto polyfill loaded. Worker ready.');
+
+// 1. Connect to Database (Worker needs its own connection)
 
 mongoose
   .connect(
     process.env.DATABASE.replace('<db_password>', process.env.DATABASE_PASSWORD)
   )
   .then(() => console.log('📦 [Worker] Connected to MongoDB'))
-  .catch((err) => console.error('❌ [Worker] DB Connection Error:', err));
+  .catch((err) => {
+    const appError = new AppError(
+      `[Worker] DB Connection Error: ${err.message}`,
+      500
+    );
+    console.error('❌', appError.message);
+    process.exit(1);
+  });
 
 const startWorker = async () => {
   const connection = await amqp.connect(process.env.RABBITMQ_URL);
@@ -156,7 +160,11 @@ const startWorker = async () => {
           );
           channel.ack(msg);
         } catch (error) {
-          console.error(`❌ [Worker] Failed:`, error);
+          const appError = new AppError(
+            `[Worker] Failed to process track ${ticket.trackId}: ${error.message}`,
+            500
+          );
+          console.error('❌', appError.message);
 
           // Clean up temp files even if it fails
           if (fs.existsSync(tempDir))
@@ -170,4 +178,11 @@ const startWorker = async () => {
   );
 };
 
-startWorker();
+startWorker().catch((error) => {
+  const appError = new AppError(
+    `[Worker] Fatal startup error: ${error.message}`,
+    500
+  );
+  console.error('❌', appError.message);
+  process.exit(1);
+});
