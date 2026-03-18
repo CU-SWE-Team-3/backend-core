@@ -8,6 +8,7 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const { generateRealWaveform } = require('../utils/audioUtils'); // <-- ADD THIS
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
+
 if (!global.crypto) {
   global.crypto = require('node:crypto').webcrypto;
 }

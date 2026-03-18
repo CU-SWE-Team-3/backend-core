@@ -108,7 +108,7 @@ app.use('/api/tracks', trackRoutes);
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes
 // ==========================================
-app.all('*', (req, res, next) => {
+app.all('/{*path}', (req, res, next) => {
   next(new AppError(`Route ${req.originalUrl} not found`, 404));
 });
 
