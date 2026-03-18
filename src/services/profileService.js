@@ -67,7 +67,6 @@ exports.updateTier = async (userId, role) => {
 };
 
 exports.updateProfileData = async (userId, updateData) => {
-  // Only allow updating specific fields to prevent security risks
   const allowedUpdates = {
     bio: updateData.bio,
     country: updateData.country,
@@ -77,7 +76,6 @@ exports.updateProfileData = async (userId, updateData) => {
     permalink: updateData.permalink,
   };
 
-  // Remove undefined fields so we don't accidentally overwrite existing data
   Object.keys(allowedUpdates).forEach(
     (key) => allowedUpdates[key] === undefined && delete allowedUpdates[key]
   );
@@ -86,18 +84,15 @@ exports.updateProfileData = async (userId, updateData) => {
     userId,
     { $set: allowedUpdates },
     { new: true, runValidators: true }
-  );
+  ).select('displayName permalink bio country city genres');
 };
 
-// Removed fileBuffer parameter here to fix the ESLint error!
-// Upgraded to use real Azure Blob Storage!
+// FIX: select only avatarUrl and coverUrl — controller returns just what changed
 exports.updateProfileImages = async (userId, uploadedFiles) => {
   const updateFields = {};
 
-  // 1. Did they upload an avatar?
   if (uploadedFiles.avatar && uploadedFiles.avatar[0]) {
     const file = uploadedFiles.avatar[0];
-    // We pass 'avatars' as the folder name so Azure keeps it organized!
     const azureUrl = await uploadImageToAzure(
       file.buffer,
       file.mimetype,
@@ -106,10 +101,8 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
     updateFields.avatarUrl = azureUrl;
   }
 
-  // 2. Did they upload a cover photo?
   if (uploadedFiles.cover && uploadedFiles.cover[0]) {
     const file = uploadedFiles.cover[0];
-    // We pass 'covers' as the folder name!
     const azureUrl = await uploadImageToAzure(
       file.buffer,
       file.mimetype,
@@ -118,15 +111,13 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
     updateFields.coverUrl = azureUrl;
   }
 
-  // 3. Safety check
   if (Object.keys(updateFields).length === 0) {
-    throw new AppError('No valid image fields provided', 400);
+    throw new Error('No valid image fields provided');
   }
 
-  // 4. Update the database with the real Azure URLs
   return User.findByIdAndUpdate(
     userId,
     { $set: updateFields },
-    { new: true, select: '-password' }
-  );
+    { new: true }
+  ).select('avatarUrl coverUrl');
 };

@@ -87,23 +87,20 @@ exports.updateVisibility = catchAsync(async (req, res, next) => {
  * @access  Private (Track Owner)
  */
 exports.uploadArtwork = catchAsync(async (req, res, next) => {
-  const trackId = req.params.id;
-  const userId = req.user._id || req.user.id;
-
   if (!req.file) {
     return next(new AppError('Please provide an image file', 400));
   }
 
   const updatedTrack = await trackService.updateTrackArtwork(
-    trackId,
-    userId,
+    req.params.id,
+    req.user._id || req.user.id,
     req.file
   );
 
   res.status(200).json({
     success: true,
     message: 'Track artwork uploaded successfully',
-    data: { track: updatedTrack },
+    data: { artworkUrl: updatedTrack.artworkUrl },
   });
 });
 

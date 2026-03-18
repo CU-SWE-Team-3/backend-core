@@ -41,16 +41,22 @@ exports.updateSocialLinks = catchAsync(async (req, res, next) => {
 
 exports.updateProfile = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
-
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
+  if (!userId) return next(new AppError('User ID is required', 400));
 
   const updatedUser = await profileService.updateProfileData(userId, req.body);
 
   res.status(200).json({
     success: true,
-    data: updatedUser,
+    data: {
+      user: {
+        displayName: updatedUser.displayName,
+        permalink: updatedUser.permalink,
+        bio: updatedUser.bio,
+        country: updatedUser.country,
+        city: updatedUser.city,
+        genres: updatedUser.genres,
+      },
+    },
   });
 });
 
@@ -78,10 +84,7 @@ exports.uploadProfileImages = catchAsync(async (req, res, next) => {
   }
 
   const userId = (req.user && req.user.id) || req.user._id;
-
-  if (!userId) {
-    return next(new AppError('User ID is required', 400));
-  }
+  if (!userId) return next(new AppError('User ID is required', 400));
 
   const updatedUser = await profileService.updateProfileImages(
     userId,
@@ -90,7 +93,10 @@ exports.uploadProfileImages = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    data: updatedUser,
+    data: {
+      avatarUrl: updatedUser.avatarUrl,
+      coverUrl: updatedUser.coverUrl,
+    },
   });
 });
 
