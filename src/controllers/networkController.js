@@ -1,29 +1,36 @@
 const networkService = require('../services/networkService');
 const catchAsync = require('../utils/catchAsync');
 
-exports.followUser = catchAsync(async (req, res) => {
+
+exports.followUser = catchAsync(async (req, res, next) => {
   const followerId = req.user._id || req.user.id;
   const followingId = req.params.id;
 
-  await networkService.followUser(followerId, followingId);
+  const counts = await networkService.followUser(followerId, followingId);
 
-  res
-    .status(200)
-    .json({ success: true, message: 'Successfully followed user.' });
+  res.status(200).json({
+    success: true,
+    message: 'Successfully followed user.',
+    data: counts,
+  });
 });
 
-exports.unfollowUser = catchAsync(async (req, res) => {
+// FIX: unfollow also returns updated counts
+exports.unfollowUser = catchAsync(async (req, res, next) => {
   const followerId = req.user._id || req.user.id;
   const followingId = req.params.id;
 
-  await networkService.unfollowUser(followerId, followingId);
+  const counts = await networkService.unfollowUser(followerId, followingId);
 
-  res
-    .status(200)
-    .json({ success: true, message: 'Successfully unfollowed user.' });
+  res.status(200).json({
+    success: true,
+    message: 'Successfully unfollowed user.',
+    data: counts,
+  });
 });
 
-exports.getFeed = catchAsync(async (req, res) => {
+// FIX: feed now returns tracks from followed artists, not user profiles
+exports.getFeed = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
   const feed = await networkService.getUserFeed(userId);
 
@@ -33,7 +40,6 @@ exports.getFeed = catchAsync(async (req, res) => {
     data: feed,
   });
 });
-
 exports.getFollowers = catchAsync(async (req, res, next) => {
   const { userId } = req.params;
   const { page, limit } = req.query;

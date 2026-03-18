@@ -103,36 +103,32 @@ exports.login = catchAsync(async (req, res, next) => {
   });
 });
 // UPDATED: Extracts and passes captchaToken
-exports.register = catchAsync(async (req, res) => {
+exports.register = catchAsync(async (req, res, next) => {
   const { email, password, age, displayName, gender, captchaToken } = req.body;
+
   const { user } = await authService.registerUser(
     { email, password, age, displayName, gender },
     captchaToken
   );
 
   res.status(201).json({
-    _id: user._id,
-    permalink: user.permalink,
-    displayName: user.displayName,
-    isEmailVerified: user.isEmailVerified,
-    role: user.role,
-    followerCount: user.followerCount,
-    followingCount: user.followingCount,
+    success: true,
+    data: { user: formatUser(user) },
   });
 });
 
+// FIX: returns updated user so frontend can flip isEmailVerified in state immediately
 exports.verifyEmail = catchAsync(async (req, res, next) => {
   const { token } = req.body;
-  if (!token) {
-    return next(new AppError('Token is required', 400));
-  }
+  const user = await authService.verifyEmail(token);
 
-  await authService.verifyEmail(token);
   res.status(200).json({
     success: true,
     message: 'Email verified. You may now upload tracks.',
+    data: { user: formatUser(user) },
   });
 });
+
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   const { email } = req.body;
