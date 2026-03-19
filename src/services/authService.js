@@ -157,7 +157,9 @@ const generatePasswordReset = async (email) => {
   await user.save();
 
   // NEW: Actually send the email via Nodemailer!
-  const message = `You are receiving this email because you (or someone else) requested a password reset for your BioBeats account.\n\nPlease use the following token to reset your password:\n\n${resetToken}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`;
+  const resetUrl = `${process.env.FRONTEND_URL}/api/auth/reset-password?token=${resetToken}`;
+
+  const message = `You are receiving this email because you (or someone else) requested a password reset for your BioBeats account.\n\nPlease use the following link to reset your password:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`;
 
   try {
     await sendEmail({
