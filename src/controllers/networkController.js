@@ -1,7 +1,6 @@
 const networkService = require('../services/networkService');
 const catchAsync = require('../utils/catchAsync');
 
-
 exports.followUser = catchAsync(async (req, res, next) => {
   const followerId = req.user._id || req.user.id;
   const followingId = req.params.id;

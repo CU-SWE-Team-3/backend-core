@@ -129,7 +129,6 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
   });
 });
 
-
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   const { email } = req.body;
   if (!email) {

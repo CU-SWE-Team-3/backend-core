@@ -11,14 +11,25 @@ exports.followUser = async (followerId, followingId) => {
   const userToFollow = await User.findById(followingId);
   if (!userToFollow) throw new Error('User not found.');
 
-  const existingFollow = await Follow.findOne({ follower: followerId, following: followingId });
+  const existingFollow = await Follow.findOne({
+    follower: followerId,
+    following: followingId,
+  });
   if (existingFollow) throw new Error('You are already following this user.');
 
   await Follow.create({ follower: followerId, following: followingId });
 
   const [follower, following] = await Promise.all([
-    User.findByIdAndUpdate(followerId, { $inc: { followingCount: 1 } }, { new: true }).select('followingCount'),
-    User.findByIdAndUpdate(followingId, { $inc: { followerCount: 1 } }, { new: true }).select('followerCount'),
+    User.findByIdAndUpdate(
+      followerId,
+      { $inc: { followingCount: 1 } },
+      { new: true }
+    ).select('followingCount'),
+    User.findByIdAndUpdate(
+      followingId,
+      { $inc: { followerCount: 1 } },
+      { new: true }
+    ).select('followerCount'),
   ]);
 
   return {
@@ -31,12 +42,23 @@ exports.followUser = async (followerId, followingId) => {
 
 // FIX: same — returns updated counts after unfollow
 exports.unfollowUser = async (followerId, followingId) => {
-  const follow = await Follow.findOneAndDelete({ follower: followerId, following: followingId });
+  const follow = await Follow.findOneAndDelete({
+    follower: followerId,
+    following: followingId,
+  });
   if (!follow) throw new Error('You are not following this user.');
 
   const [follower, following] = await Promise.all([
-    User.findByIdAndUpdate(followerId, { $inc: { followingCount: -1 } }, { new: true }).select('followingCount'),
-    User.findByIdAndUpdate(followingId, { $inc: { followerCount: -1 } }, { new: true }).select('followerCount'),
+    User.findByIdAndUpdate(
+      followerId,
+      { $inc: { followingCount: -1 } },
+      { new: true }
+    ).select('followingCount'),
+    User.findByIdAndUpdate(
+      followingId,
+      { $inc: { followerCount: -1 } },
+      { new: true }
+    ).select('followerCount'),
   ]);
 
   return {
@@ -59,13 +81,14 @@ exports.getUserFeed = async (userId) => {
     processingState: 'Finished',
   })
     .populate('artist', 'displayName permalink avatarUrl')
-    .select('title permalink artworkUrl hlsUrl waveform duration genre artist playCount likeCount createdAt')
+    .select(
+      'title permalink artworkUrl hlsUrl waveform duration genre artist playCount likeCount createdAt'
+    )
     .sort({ createdAt: -1 })
     .limit(20);
 
   return feed;
 };
-
 
 exports.getFollowers = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
