@@ -1,5 +1,6 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const path = require('path');
+const AppError = require('./appError');
 
 /**
  * Uploads a file buffer to Azure Blob Storage
@@ -18,7 +19,10 @@ exports.uploadImageToAzure = async (
     const containerName = process.env.AZURE_CONTAINER_NAME || 'biobeats-assets';
 
     if (!connectionString) {
-      throw new Error('Azure Storage connection string is missing in .env');
+      throw new AppError(
+        'Azure Storage connection string is missing in .env',
+        500
+      );
     }
 
     // 1. Initialize the Azure client
@@ -42,6 +46,6 @@ exports.uploadImageToAzure = async (
     // 6. Return the public URL to be saved in MongoDB
     return blockBlobClient.url;
   } catch (error) {
-    throw new Error(`Failed to upload: ${error.message}`);
+    throw new AppError(`Failed to upload: ${error.message}`, 500);
   }
 };

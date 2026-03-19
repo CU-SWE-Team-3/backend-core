@@ -1,6 +1,7 @@
 const Follow = require('../models/followModel');
 const User = require('../models/userModel');
 const Block = require('../models/blockModel');
+const AppError = require('../utils/appError');
 
 exports.followUser = async (followerId, followingId) => {
   if (followerId.toString() === followingId.toString()) {
@@ -8,61 +9,83 @@ exports.followUser = async (followerId, followingId) => {
   }
 
   const userToFollow = await User.findById(followingId);
-  if (!userToFollow) {
-    throw new Error('User not found.');
-  }
+  if (!userToFollow) throw new Error('User not found.');
 
   const existingFollow = await Follow.findOne({
     follower: followerId,
     following: followingId,
   });
+  if (existingFollow) throw new Error('You are already following this user.');
 
-  if (existingFollow) {
-    throw new Error('You are already following this user.');
-  }
+  await Follow.create({ follower: followerId, following: followingId });
 
-  const follow = await Follow.create({
-    follower: followerId,
-    following: followingId,
-  });
+  const [follower, following] = await Promise.all([
+    User.findByIdAndUpdate(
+      followerId,
+      { $inc: { followingCount: 1 } },
+      { new: true }
+    ).select('followingCount'),
+    User.findByIdAndUpdate(
+      followingId,
+      { $inc: { followerCount: 1 } },
+      { new: true }
+    ).select('followerCount'),
+  ]);
 
-  await User.findByIdAndUpdate(followerId, { $inc: { followingCount: 1 } });
-  await User.findByIdAndUpdate(followingId, { $inc: { followerCount: 1 } });
-
-  return follow;
+  return {
+    // counts for the logged-in user (followerId)
+    myFollowingCount: follower.followingCount,
+    // counts for the target user (followingId)
+    theirFollowerCount: following.followerCount,
+  };
 };
 
+// FIX: same — returns updated counts after unfollow
 exports.unfollowUser = async (followerId, followingId) => {
   const follow = await Follow.findOneAndDelete({
     follower: followerId,
     following: followingId,
   });
+  if (!follow) throw new Error('You are not following this user.');
 
-  if (!follow) {
-    throw new Error('You are not following this user.');
-  }
+  const [follower, following] = await Promise.all([
+    User.findByIdAndUpdate(
+      followerId,
+      { $inc: { followingCount: -1 } },
+      { new: true }
+    ).select('followingCount'),
+    User.findByIdAndUpdate(
+      followingId,
+      { $inc: { followerCount: -1 } },
+      { new: true }
+    ).select('followerCount'),
+  ]);
 
-  await User.findByIdAndUpdate(followerId, { $inc: { followingCount: -1 } });
-  await User.findByIdAndUpdate(followingId, { $inc: { followerCount: -1 } });
-
-  return { message: 'Unfollowed successfully' };
+  return {
+    myFollowingCount: follower.followingCount,
+    theirFollowerCount: following.followerCount,
+  };
 };
 
-// auomatically generate feed for user based on who they follow
+// FIX: returns recent tracks from followed artists — not user profiles
+// This is what a music feed is: content, not people
 exports.getUserFeed = async (userId) => {
-  // 1. Find the IDs of everyone the user follows
   const followingRels = await Follow.find({ follower: userId });
   const followingIds = followingRels.map((rel) => rel.following);
 
-  if (followingIds.length === 0) {
-    return []; // Return empty if following no one
-  }
+  if (followingIds.length === 0) return [];
 
-  // 2. Find the users in that list and sort by their most recent activity/update
-  const feed = await User.find({ _id: { $in: followingIds } })
-    .select('_id displayName avatarUrl permalink bio updatedAt')
-    .sort({ updatedAt: -1 }) // Newest updates at the top
-    .limit(10);
+  const feed = await Track.find({
+    artist: { $in: followingIds },
+    isPublic: true,
+    processingState: 'Finished',
+  })
+    .populate('artist', 'displayName permalink avatarUrl')
+    .select(
+      'title permalink artworkUrl hlsUrl waveform duration genre artist playCount likeCount createdAt'
+    )
+    .sort({ createdAt: -1 })
+    .limit(20);
 
   return feed;
 };
@@ -176,7 +199,7 @@ exports.getBlockedUsers = async (userId) => {
 
 exports.blockUser = async (blockerId, blockedId) => {
   if (blockerId.toString() === blockedId.toString()) {
-    throw new Error('You cannot block yourself');
+    throw new AppError('You cannot block yourself', 400);
   }
 
   const existingBlock = await Block.findOne({
@@ -185,7 +208,7 @@ exports.blockUser = async (blockerId, blockedId) => {
   });
 
   if (existingBlock) {
-    throw new Error('User is already blocked');
+    throw new AppError('User is already blocked', 409);
   }
 
   await Block.create({ blocker: blockerId, blocked: blockedId });
@@ -208,7 +231,7 @@ exports.unblockUser = async (blockerId, blockedId) => {
   });
 
   if (!existingBlock) {
-    throw new Error('User is not blocked');
+    throw new AppError('User is not blocked', 404);
   }
 
   await Block.findByIdAndDelete(existingBlock._id);

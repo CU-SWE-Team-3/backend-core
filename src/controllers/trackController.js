@@ -1,4 +1,6 @@
 const trackService = require('../services/trackService');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/appError');
 
 // ==========================================
 // BE-3: METADATA & VISIBILITY CONTROLLERS
@@ -9,178 +11,151 @@ const trackService = require('../services/trackService');
  * @route   PATCH /api/tracks/:id/metadata
  * @access  Private (Track Owner)
  */
-exports.updateMetadata = async (req, res) => {
-  try {
-    const trackId = req.params.id;
-    const userId = req.user._id || req.user.id; // Comes from authMiddleware
-    const metadataBody = req.body;
 
-    const updatedTrack = await trackService.updateTrackMetadata(
-      trackId,
-      userId,
-      metadataBody
-    );
+const formatTrack = (track) => ({
+  _id: track._id,
+  title: track.title,
+  permalink: track.permalink,
+  description: track.description,
+  genre: track.genre,
+  tags: track.tags,
+  releaseDate: track.releaseDate,
+  artworkUrl: track.artworkUrl,
+  hlsUrl: track.hlsUrl,
+  waveform: track.waveform,
+  duration: track.duration,
+  format: track.format,
+  isPublic: track.isPublic,
+  processingState: track.processingState,
+  playCount: track.playCount,
+  likeCount: track.likeCount,
+  repostCount: track.repostCount,
+  commentCount: track.commentCount,
+  artist: track.artist,
+  createdAt: track.createdAt,
+});
 
-    res.status(200).json({
-      success: true,
-      message: 'Track metadata updated successfully',
-      data: { track: updatedTrack },
-    });
-  } catch (error) {
-    // If the service throws an error (e.g., "Track not found" or permission denied)
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
+exports.updateMetadata = catchAsync(async (req, res) => {
+  const trackId = req.params.id;
+  const userId = req.user._id || req.user.id;
+  const metadataBody = req.body;
+
+  const updatedTrack = await trackService.updateTrackMetadata(
+    trackId,
+    userId,
+    metadataBody
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Track metadata updated successfully',
+    data: { track: updatedTrack },
+  });
+});
 
 /**
  * @desc    Toggle track visibility (Public / Private)
  * @route   PATCH /api/tracks/:id/visibility
  * @access  Private (Track Owner)
  */
-exports.updateVisibility = async (req, res) => {
-  try {
-    const trackId = req.params.id;
-    const userId = req.user._id || req.user.id;
-    const { isPublic } = req.body;
+exports.updateVisibility = catchAsync(async (req, res, next) => {
+  const trackId = req.params.id;
+  const userId = req.user._id || req.user.id;
+  const { isPublic } = req.body;
 
-    // Validate input
-    if (typeof isPublic !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        error: 'isPublic field must be a boolean (true or false)',
-      });
-    }
-
-    const updatedTrack = await trackService.toggleTrackVisibility(
-      trackId,
-      userId,
-      isPublic
+  if (typeof isPublic !== 'boolean') {
+    return next(
+      new AppError('isPublic field must be a boolean (true or false)', 400)
     );
-
-    res.status(200).json({
-      success: true,
-      message: `Track is now ${isPublic ? 'Public' : 'Private'}`,
-      data: { track: updatedTrack },
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
   }
-};
+
+  const updatedTrack = await trackService.toggleTrackVisibility(
+    trackId,
+    userId,
+    isPublic
+  );
+
+  res.status(200).json({
+    success: true,
+    message: `Track is now ${isPublic ? 'Public' : 'Private'}`,
+    data: { track: updatedTrack },
+  });
+});
 /**
  * @desc    Upload track artwork
  * @route   PATCH /api/tracks/:id/artwork
  * @access  Private (Track Owner)
  */
-exports.uploadArtwork = async (req, res) => {
-  try {
-    const trackId = req.params.id;
-    const userId = req.user._id || req.user.id;
-
-    // Check if the file was passed by the multer middleware
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide an image file',
-      });
-    }
-
-    const updatedTrack = await trackService.updateTrackArtwork(
-      trackId,
-      userId,
-      req.file
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Track artwork uploaded successfully',
-      data: { track: updatedTrack },
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+exports.uploadArtwork = catchAsync(async (req, res, next) => {
+  if (!req.file) {
+    return next(new AppError('Please provide an image file', 400));
   }
-};
-exports.initiateUpload = async (req, res) => {
-  try {
-    const result = await trackService.generateUploadUrl(req.user, req.body);
-    res.status(201).json({
-      success: true,
-      message: 'Upload authorized. Proceed with direct-to-cloud streaming.',
-      data: result,
-    });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+
+  const updatedTrack = await trackService.updateTrackArtwork(
+    req.params.id,
+    req.user._id || req.user.id,
+    req.file
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Track artwork uploaded successfully',
+    data: { artworkUrl: updatedTrack.artworkUrl },
+  });
+});
+
+exports.initiateUpload = catchAsync(async (req, res) => {
+  const result = await trackService.generateUploadUrl(req.user, req.body);
+  res.status(201).json({
+    success: true,
+    message: 'Upload authorized. Proceed with direct-to-cloud streaming.',
+    data: result,
+  });
+});
+
+exports.confirmUpload = catchAsync(async (req, res, next) => {
+  const track = await trackService.confirmUpload(req.params.id, req.user._id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Track upload confirmed. Processing has started.',
+    data: {
+      trackId: track._id,
+      permalink: track.permalink,
+      title: track.title,
+      processingState: track.processingState,
+    },
+  });
+});
+
+exports.getTrack = catchAsync(async (req, res, next) => {
+  const { permalink } = req.params;
+  const track = await trackService.getTrackByPermalink(permalink);
+
+  res.status(200).json({
+    success: true,
+    data: { track: formatTrack(track) },
+  });
+});
+
+exports.downloadTrack = catchAsync(async (req, res) => {
+  const { stream, contentLength, filename } =
+    await trackService.downloadTrackAudio(req.params.id, req.user);
+
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  if (contentLength) {
+    res.setHeader('Content-Length', contentLength);
   }
-};
 
-exports.confirmUpload = async (req, res) => {
-  try {
-    const track = await trackService.confirmUpload(req.params.id, req.user._id);
-    res.status(200).json({
-      success: true,
-      message: 'Track upload confirmed and published.',
-      data: track,
-    });
-  } catch (error) {
-    res.status(404).json({ success: false, error: error.message });
-  }
-};
+  stream.pipe(res);
+});
 
-exports.getTrack = async (req, res) => {
-  try {
-    // 1. Grab the permalink from the URL parameters
-    const { permalink } = req.params;
+exports.deleteTrack = catchAsync(async (req, res) => {
+  await trackService.deleteTrack(req.params.id, req.user._id);
 
-    // 2. Pass it to the updated service method
-    const track = await trackService.getTrackByPermalink(permalink);
-
-    res.status(200).json({ success: true, data: track });
-  } catch (error) {
-    const statusCode = error.message.includes('not found') ? 404 : 400;
-    res.status(statusCode).json({ success: false, error: error.message });
-  }
-};
-
-exports.downloadTrack = async (req, res) => {
-  try {
-    const { stream, contentLength, filename } =
-      await trackService.downloadTrackAudio(req.params.id, req.user);
-
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    if (contentLength) res.setHeader('Content-Length', contentLength);
-
-    stream.pipe(res);
-  } catch (error) {
-    // 403 Forbidden for Premium blocks, 404 for missing tracks
-    const statusCode = error.message.includes('Premium') ? 403 : 404;
-    res.status(statusCode).json({ success: false, error: error.message });
-  }
-};
-
-exports.deleteTrack = async (req, res) => {
-  try {
-    // Pass the track ID from the URL, and the user ID from the JWT token
-    await trackService.deleteTrack(req.params.id, req.user._id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Track and associated audio file deleted successfully.',
-    });
-  } catch (error) {
-    // 403 if they don't own it, 404 if it doesn't exist
-    const statusCode = error.message.includes('Unauthorized') ? 403 : 404;
-    res.status(statusCode).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Track and associated audio file deleted successfully.',
+  });
+});

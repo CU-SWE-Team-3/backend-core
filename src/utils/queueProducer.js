@@ -1,4 +1,5 @@
 const amqp = require('amqplib');
+const AppError = require('./appError');
 
 // 1. Create a global variable outside the function
 let globalChannel = null;
@@ -29,5 +30,6 @@ exports.publishToQueue = async (queueName, data) => {
     // Do not close the connection. Leave it open for the next track.
   } catch (error) {
     console.error('❌ [RabbitMQ Error] Failed to publish message:', error);
+    throw new AppError('Failed to publish processing message to queue.', 500);
   }
 };

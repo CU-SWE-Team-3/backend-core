@@ -1,25 +1,24 @@
 const User = require('../models/userModel'); // Ensure this points to the merged model
 const { uploadImageToAzure } = require('../utils/azureStorage');
+const AppError = require('../utils/appError');
 
 exports.getProfileByPermalink = async (permalink) => {
   const user = await User.findOne({ permalink }).select(
-    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink isPrivate'
+    'displayName bio country city genres avatarUrl coverUrl role followerCount followingCount socialLinks createdAt permalink isPrivate isPremium'
   );
 
   if (!user) {
-    // Throw with a code the controller can read
     const err = new Error('Profile not found.');
     err.statusCode = 404;
     throw err;
   }
 
   if (user.isPrivate) {
-    // Return limited public info instead of throwing — cleaner UX
-    // The frontend knows the profile exists but can't see the details
     return {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       permalink: user.permalink,
+      role: user.role,
       isPrivate: true,
     };
   }
@@ -31,8 +30,8 @@ exports.updatePrivacy = async (userId, isPrivate) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { isPrivate },
-    { new: true, runValidators: true, select: '-password' } // Exclude sensitive info
-  );
+    { new: true, runValidators: true }
+  ).select('isPrivate');
   if (!user) throw new Error('User not found');
   return user;
 };
@@ -41,8 +40,8 @@ exports.updateSocialLinks = async (userId, socialLinks) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { socialLinks },
-    { new: true, runValidators: true, select: '-password' }
-  );
+    { new: true, runValidators: true }
+  ).select('socialLinks');
   if (!user) throw new Error('User not found');
   return user;
 };
@@ -51,9 +50,8 @@ exports.removeSocialLink = async (userId, linkId) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { $pull: { socialLinks: { _id: linkId } } },
-    { new: true, select: '-password' }
-  );
-
+    { new: true }
+  ).select('socialLinks');
   if (!user) throw new Error('User not found');
   return user;
 };
@@ -62,14 +60,13 @@ exports.updateTier = async (userId, role) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { role },
-    { new: true, runValidators: true, select: '-password' }
-  );
+    { new: true, runValidators: true }
+  ).select('role');
   if (!user) throw new Error('User not found');
   return user;
 };
 
 exports.updateProfileData = async (userId, updateData) => {
-  // Only allow updating specific fields to prevent security risks
   const allowedUpdates = {
     bio: updateData.bio,
     country: updateData.country,
@@ -79,7 +76,6 @@ exports.updateProfileData = async (userId, updateData) => {
     permalink: updateData.permalink,
   };
 
-  // Remove undefined fields so we don't accidentally overwrite existing data
   Object.keys(allowedUpdates).forEach(
     (key) => allowedUpdates[key] === undefined && delete allowedUpdates[key]
   );
@@ -88,18 +84,15 @@ exports.updateProfileData = async (userId, updateData) => {
     userId,
     { $set: allowedUpdates },
     { new: true, runValidators: true }
-  );
+  ).select('displayName permalink bio country city genres');
 };
 
-// Removed fileBuffer parameter here to fix the ESLint error!
-// Upgraded to use real Azure Blob Storage!
+// FIX: select only avatarUrl and coverUrl — controller returns just what changed
 exports.updateProfileImages = async (userId, uploadedFiles) => {
   const updateFields = {};
 
-  // 1. Did they upload an avatar?
   if (uploadedFiles.avatar && uploadedFiles.avatar[0]) {
     const file = uploadedFiles.avatar[0];
-    // We pass 'avatars' as the folder name so Azure keeps it organized!
     const azureUrl = await uploadImageToAzure(
       file.buffer,
       file.mimetype,
@@ -108,10 +101,8 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
     updateFields.avatarUrl = azureUrl;
   }
 
-  // 2. Did they upload a cover photo?
   if (uploadedFiles.cover && uploadedFiles.cover[0]) {
     const file = uploadedFiles.cover[0];
-    // We pass 'covers' as the folder name!
     const azureUrl = await uploadImageToAzure(
       file.buffer,
       file.mimetype,
@@ -120,15 +111,13 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
     updateFields.coverUrl = azureUrl;
   }
 
-  // 3. Safety check
   if (Object.keys(updateFields).length === 0) {
     throw new Error('No valid image fields provided');
   }
 
-  // 4. Update the database with the real Azure URLs
   return User.findByIdAndUpdate(
     userId,
     { $set: updateFields },
-    { new: true, select: '-password' }
-  );
+    { new: true }
+  ).select('avatarUrl coverUrl');
 };
