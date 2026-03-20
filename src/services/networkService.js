@@ -2,6 +2,7 @@ const Follow = require('../models/followModel');
 const User = require('../models/userModel');
 const Block = require('../models/blockModel');
 const AppError = require('../utils/appError');
+const Track = require('../models/trackModel');
 
 exports.followUser = async (followerId, followingId) => {
   if (followerId.toString() === followingId.toString()) {

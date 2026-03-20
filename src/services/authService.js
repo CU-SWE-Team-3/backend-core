@@ -83,6 +83,10 @@ const handleMobileGoogleLogin = async (idToken) => {
     audience: [
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_ANDROID_CLIENT_ID,
+      process.env.GOOGLE_ANDROID_CLIENT_ID_2,
+      process.env.GOOGLE_ANDROID_CLIENT_ID_3,
+      process.env.GOOGLE_ANDROID_CLIENT_ID_4,
+      process.env.GOOGLE_ANDROID_CLIENT_ID_5,
     ],
   });
   const payload = ticket.getPayload();
@@ -122,7 +126,7 @@ const registerUser = async (userData, captchaToken) => {
     emailVerificationToken: verificationToken,
   });
 
-  const verificationUrl = `http://${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
   const message = `Welcome to BioBeats, ${user.displayName}!\n\nPlease verify your account by clicking the link below:\n\n${verificationUrl}\n\nIf you did not request this, please ignore this email.`;
 
   try {
@@ -211,7 +215,7 @@ const resendVerificationEmail = async (email) => {
   user.emailVerificationToken = verificationToken;
   await user.save();
 
-  const verificationUrl = `http://${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
   const message = `Hi ${user.displayName},\n\nHere is your new verification link:\n\n${verificationUrl}\n\nThis link does not expire automatically — request a new one if needed.`;
 
   await sendEmail({
@@ -238,7 +242,7 @@ const requestEmailUpdate = async (userId, newEmail) => {
   await user.save();
 
   // 3. Send the verification link to the NEW address (not the current one)
-  const confirmUrl = `http://${process.env.FRONTEND_URL}/api/auth/confirm-email-update?token=${token}`;
+  const confirmUrl = `${process.env.FRONTEND_URL}/api/auth/confirm-email-update?token=${token}`;
   const message = `Hi ${user.displayName},\n\nClick the link below to confirm your new email address:\n\n${confirmUrl}\n\nIf you did not request this, you can ignore this email.`;
 
   await sendEmail({
