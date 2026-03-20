@@ -1,3 +1,4 @@
+require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
 require('dotenv').config();
 const amqp = require('amqplib');
 const mongoose = require('mongoose');

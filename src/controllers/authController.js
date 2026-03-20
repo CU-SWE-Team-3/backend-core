@@ -70,7 +70,7 @@ exports.handleGoogleCallback = catchAsync(async (req, res, next) => {
 
   attachAuthCookies(res, token, refreshToken);
 
-  const frontendUrl = `http://localhost:5173/google/callback?permalink=${user.permalink}`;
+  const frontendUrl = `${process.env.FRONTEND_URL}/google/callback?permalink=${user.permalink}`;
   res.redirect(frontendUrl);
 });
 
