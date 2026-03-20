@@ -60,6 +60,17 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
   return track;
 };
 
+exports.getMyTracks = async (userId) => {
+  const tracks = await Track.find({
+    artist: userId,
+    processingState: 'Finished',
+  })
+    .select('-audioUrl')
+    .sort({ createdAt: -1 });
+
+  return tracks;
+};
+
 /**
  * Toggles the track between Public and Private
  */

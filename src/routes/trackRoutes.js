@@ -37,6 +37,7 @@ router.patch(
 // 1. Direct-to-Cloud Upload Pipeline
 router.post('/upload', protect, trackController.initiateUpload);
 router.patch('/:id/confirm', protect, trackController.confirmUpload);
+router.get('/my-tracks', protect, trackController.getMyTracks);
 
 // 2. Fetch & Stream (Public)
 router.get('/:permalink', trackController.getTrack);

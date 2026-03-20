@@ -35,6 +35,17 @@ const formatTrack = (track) => ({
   createdAt: track.createdAt,
 });
 
+exports.getMyTracks = catchAsync(async (req, res, next) => {
+  const userId = req.user._id;
+  const tracks = await trackService.getMyTracks(userId);
+
+  res.status(200).json({
+    success: true,
+    count: tracks.length,
+    data: tracks.map(formatTrack),
+  });
+});
+
 exports.updateMetadata = catchAsync(async (req, res) => {
   const trackId = req.params.id;
   const userId = req.user._id || req.user.id;
