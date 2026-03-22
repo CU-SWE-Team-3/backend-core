@@ -100,6 +100,9 @@ const loginUser = async (email, password) => {
   if (!user) throw new AppError('Invalid email or password.', 401);
   const isMatch = await user.matchPassword(password);
   if (!isMatch) throw new AppError('Invalid email or password.', 401);
+  if (user.isEmailVerified === false) {
+    throw new AppError('Please verify your email address before logging in.', 403); 
+  }
   return user;
 };
 
