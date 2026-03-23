@@ -94,7 +94,10 @@ exports.getUserFeed = async (userId) => {
 exports.getFollowers = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
   const followers = await Follow.find({ following: userId })
-    .populate('follower', 'displayName permalink avatarUrl role isPremium')
+    .populate(
+      'follower',
+      'displayName permalink avatarUrl role isPremium followerCount'
+    )
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 });
@@ -105,7 +108,10 @@ exports.getFollowers = async (userId, page = 1, limit = 20) => {
 exports.getFollowing = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
   const following = await Follow.find({ follower: userId })
-    .populate('following', 'displayName permalink avatarUrl role isPremium')
+    .populate(
+      'following',
+      'displayName permalink avatarUrl role isPremium followingCount'
+    )
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 });

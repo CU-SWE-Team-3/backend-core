@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
+const path = require('path');
 // const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
@@ -87,6 +88,8 @@ app.use(mongoSanitize());
 // ==========================================
 // 2. ROUTES
 // ==========================================
+app.use('/.well-known', express.static(path.join(__dirname, '.well-known')));
+
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
@@ -99,8 +102,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/network', networkRoutes);
 
 app.use('/api/profile', profileRoutes);
-
-app.use('/api/network', networkRoutes);
 
 app.use('/api/tracks', trackRoutes);
 

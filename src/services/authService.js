@@ -101,7 +101,10 @@ const loginUser = async (email, password) => {
   const isMatch = await user.matchPassword(password);
   if (!isMatch) throw new AppError('Invalid email or password.', 401);
   if (user.isEmailVerified === false) {
-    throw new AppError('Please verify your email address before logging in.', 403); 
+    throw new AppError(
+      'Please verify your email address before logging in.',
+      403
+    );
   }
   return user;
 };
@@ -129,7 +132,7 @@ const registerUser = async (userData, captchaToken) => {
     emailVerificationToken: verificationToken,
   });
 
-  const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
   const message = `Welcome to BioBeats, ${user.displayName}!\n\nPlease verify your account by clicking the link below:\n\n${verificationUrl}\n\nIf you did not request this, please ignore this email.`;
 
   try {
@@ -164,7 +167,7 @@ const generatePasswordReset = async (email) => {
   await user.save();
 
   // NEW: Actually send the email via Nodemailer!
-  const resetUrl = `${process.env.FRONTEND_URL}/api/auth/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
   const message = `You are receiving this email because you (or someone else) requested a password reset for your BioBeats account.\n\nPlease use the following link to reset your password:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`;
 
@@ -218,7 +221,7 @@ const resendVerificationEmail = async (email) => {
   user.emailVerificationToken = verificationToken;
   await user.save();
 
-  const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
   const message = `Hi ${user.displayName},\n\nHere is your new verification link:\n\n${verificationUrl}\n\nThis link does not expire automatically — request a new one if needed.`;
 
   await sendEmail({
@@ -245,7 +248,7 @@ const requestEmailUpdate = async (userId, newEmail) => {
   await user.save();
 
   // 3. Send the verification link to the NEW address (not the current one)
-  const confirmUrl = `${process.env.FRONTEND_URL}/api/auth/confirm-email-update?token=${token}`;
+  const confirmUrl = `${process.env.FRONTEND_URL}/confirm-email-update?token=${token}`;
   const message = `Hi ${user.displayName},\n\nClick the link below to confirm your new email address:\n\n${confirmUrl}\n\nIf you did not request this, you can ignore this email.`;
 
   await sendEmail({
