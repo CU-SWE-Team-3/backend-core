@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/appError');
+// const AppError = require('../utils/appError');
 
 exports.protect = catchAsync(async (req, res, next) => {
   let token;
@@ -15,28 +15,33 @@ exports.protect = catchAsync(async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
+  // 🟢 FIX 1: Send 401 directly if there is no token
   if (!token) {
-    return next(
-      new AppError(
-        'Not authorized to access this route. No token provided.',
-        401
-      )
-    );
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+    });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const currentUser = await User.findById(decoded.id);
 
+    // 🟢 FIX 2: Send 401 directly if the user was deleted
     if (!currentUser) {
-      return next(
-        new AppError('The user belonging to this token no longer exists.', 401)
-      );
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+      });
     }
 
     req.user = currentUser;
     next();
   } catch (error) {
-    next(new AppError('Not authorized. Token failed or expired.', 401));
+    // 🟢 FIX 3: Catch JWT errors (like expired tokens) and send 401 directly
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+    });
   }
 });
