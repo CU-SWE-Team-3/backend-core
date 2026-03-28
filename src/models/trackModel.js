@@ -95,13 +95,6 @@ const trackSchema = new mongoose.Schema(
       default: 'Processing',
     },
 
-    // --- BE-4 ACCESS & MODERATION ---
-    visibility: {
-      type: String,
-      enum: ['public', 'private'],
-      default: 'public',
-    },
-
     // --- METRICS (Updated dynamically via Module 3 actions) ---
     playCount: {
       type: Number,
