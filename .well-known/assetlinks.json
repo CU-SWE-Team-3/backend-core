@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.biobeats.app",
+      "package_name": "com.soundclone.soundcloud_clone",
       "sha256_cert_fingerprints": [
         "81:9A:8D:A1:E8:63:BA:2F:78:08:B2:E8:5C:6B:60:CF:C4:BD:A9:0B:6F:95:1A:9E:C4:A1:AD:07:36:49:48:AC",
         "88:55:F8:CB:A4:60:A7:4C:E6:08:C5:07:00:FA:61:DE:EA:B8:F3:E1:75:FB:9A:9F:C7:B5:F3:E8:21:7D:BC:58",
