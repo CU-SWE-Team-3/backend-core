@@ -11,10 +11,11 @@ exports.recordPlaybackProgress = async (userId, trackId, progress) => {
   const track = await Track.findById(trackId);
   if (!track) return null;
 
-  const historyRecord = await ListenHistory.findOne({
-    user: userId,
-    track: trackId,
-  });
+  const historyRecord = await ListenHistory.findOneAndUpdate(
+    { user: userId, track: trackId },
+    { progress: progress, playedAt: Date.now() },
+    { new: true, upsert: true }
+  ).select('-__v');
 
   // 1. Define our thresholds
   const isStartingOver = progress < track.duration * 0.1; // Under 10%
@@ -60,7 +61,8 @@ exports.getRecentlyPlayed = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
 
   const history = await ListenHistory.find({ user: userId })
-    .sort({ playedAt: -1 }) // Sort by newest first
+    .select('-__v')
+    .sort({ playedAt: -1 })
     .skip(skip)
     .limit(limit)
     .populate({

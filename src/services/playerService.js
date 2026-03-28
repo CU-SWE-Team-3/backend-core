@@ -1,8 +1,9 @@
 const Track = require('../models/trackModel');
 const PlayerState = require('../models/playerStateModel');
+const playbackService = require('./playbackService');
 const AppError = require('../utils/appError');
 
-exports.getStreamingData = async (trackId, userId) => {
+exports.getStreamingData = async (trackId, user) => {
   const track = await Track.findById(trackId);
 
   if (!track) {
@@ -13,9 +14,8 @@ exports.getStreamingData = async (trackId, userId) => {
     throw new AppError('Track audio is still processing or unavailable', 400);
   }
 
-  if (!track.isPublic && track.artist.toString() !== userId) {
-    throw new AppError('You do not have permission to stream this track', 403);
-  }
+  // This will automatically throw a 403 error if they are blocked.
+  playbackService.checkAccessibility(user, track, 'stream');
 
   return {
     streamUrl: track.hlsUrl,
@@ -25,11 +25,13 @@ exports.getStreamingData = async (trackId, userId) => {
 };
 
 exports.getPlayerState = async (userId) => {
-  const state = await PlayerState.findOne({ user: userId }).populate({
-    path: 'currentTrack',
-    select: 'title permalink artworkUrl duration artist',
-    populate: { path: 'artist', select: 'displayName permalink' },
-  });
+  const state = await PlayerState.findOne({ user: userId })
+    .select('-__v')
+    .populate({
+      path: 'currentTrack',
+      select: 'title permalink artworkUrl duration artist',
+      populate: { path: 'artist', select: 'displayName permalink' }, // <-- Gets the Artist info
+    });
 
   if (!state) {
     return {
@@ -47,46 +49,36 @@ exports.getPlayerState = async (userId) => {
 exports.updatePlayerState = async (userId, stateData) => {
   const { currentTrack, currentTime, isPlaying, queueContext, contextId } =
     stateData;
-
   let validCurrentTime = currentTime;
 
-  // 1. If a track is being played, let's strictly validate the time against the track's real duration
   if (currentTrack) {
     const track = await Track.findById(currentTrack);
+    if (!track) throw new AppError('Track not found', 404);
 
-    if (!track) {
-      throw new AppError('Track not found', 404);
-    }
-
-    // 2. Realistic Constraints: Protect the database from impossible times
     if (currentTime < 0) {
-      validCurrentTime = 0; // Prevent negative time
+      validCurrentTime = 0;
     } else if (currentTime > track.duration) {
-      // If the frontend sends a time longer than the track, cap it exactly at the end of the track.
-      // We cap it instead of throwing an error because frontend timers can sometimes drift by a few milliseconds.
       validCurrentTime = track.duration;
     }
   }
 
-  // 3. Perform the Atomic Update with the validated time
   const state = await PlayerState.findOneAndUpdate(
     { user: userId },
     {
       currentTrack,
-      currentTime: validCurrentTime, // Use the safely constrained time here!
+      currentTime: validCurrentTime,
       isPlaying,
       queueContext,
       contextId,
     },
-    {
-      new: true,
-      upsert: true,
-      runValidators: true,
-    }
-  ).populate({
-    path: 'currentTrack',
-    select: 'title permalink artworkUrl duration',
-  });
+    { new: true, upsert: true, runValidators: true }
+  )
+    .select('-__v')
+    .populate({
+      path: 'currentTrack',
+      select: 'title permalink artworkUrl duration artist',
+      populate: { path: 'artist', select: 'displayName permalink' }, // <-- Gets the Artist info
+    });
 
   return state;
 };
