@@ -12,6 +12,7 @@ const networkRoutes = require('./routes/networkRoutes');
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const playerRoutes = require('./routes/playerRoutes');
 
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
@@ -104,6 +105,8 @@ app.use('/api/network', networkRoutes);
 app.use('/api/profile', profileRoutes);
 
 app.use('/api/tracks', trackRoutes);
+
+app.use('/api/player', playerRoutes);
 
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
