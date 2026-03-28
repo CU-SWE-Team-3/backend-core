@@ -2,6 +2,7 @@ const express = require('express');
 const profileController = require('../controllers/profileController');
 const upload = require('../middlewares/uploadMiddleware');
 const { protect } = require('../middlewares/authMiddleware');
+const interactionController = require('../controllers/interactionController');
 
 const router = express.Router();
 
@@ -13,6 +14,8 @@ router.delete(
   profileController.removeSocialLink
 );
 router.patch('/tier', protect, profileController.updateTier);
+
+router.get('/:userId/reposts', interactionController.getUserRepostsFeed);
 
 router.get('/:permalink', profileController.getProfileByPermalink);
 router.patch('/update', protect, profileController.updateProfile);
