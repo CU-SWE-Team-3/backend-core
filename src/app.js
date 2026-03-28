@@ -9,6 +9,8 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
 
+const historyRouter = require('./routes/historyRoutes');
+
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
@@ -89,6 +91,7 @@ app.use(mongoSanitize());
 // 2. ROUTES
 // ==========================================
 app.use('/.well-known', express.static(path.join(__dirname, '.well-known')));
+app.use('/api/history', historyRouter);
 
 app.get('/', (req, res) => {
   res.status(200).json({
