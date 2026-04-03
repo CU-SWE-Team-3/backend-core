@@ -116,7 +116,7 @@ exports.getFollowers = async (userId, page = 1, limit = 20) => {
   const followers = await Follow.find({ following: userId })
     .populate(
       'follower',
-      'displayName permalink avatarUrl role isPremium followerCount'
+      'displayName permalink avatarUrl role isPremium followerCount followingCount'
     )
     .skip(skip)
     .limit(limit)
@@ -130,7 +130,7 @@ exports.getFollowing = async (userId, page = 1, limit = 20) => {
   const following = await Follow.find({ follower: userId })
     .populate(
       'following',
-      'displayName permalink avatarUrl role isPremium followingCount'
+      'displayName permalink avatarUrl role isPremium followerCount followingCount'
     )
     .skip(skip)
     .limit(limit)
