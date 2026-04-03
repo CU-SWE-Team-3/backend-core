@@ -150,3 +150,61 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
     repostedTracks,
   };
 };
+
+/**
+ * Adds a like for a user on a specific track (BE-1: Yehia)
+ */
+exports.addLike = async (userId, trackId) => {
+  const track = await Track.findById(trackId);
+  if (!track) {
+    throw new AppError('Track not found', 404);
+  }
+
+  const existingInteraction = await Interaction.findOne({
+    actorId: userId,
+    targetId: trackId,
+    actionType: 'LIKE',
+  });
+
+  if (existingInteraction) {
+    throw new AppError('You have already liked this track', 400);
+  }
+
+  // Create interaction and increment like counter
+  await Interaction.create({
+    actorId: userId,
+    targetId: trackId,
+    actionType: 'LIKE',
+  });
+  await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: 1 } });
+
+  return { liked: true };
+};
+
+/**
+ * Removes a like for a user on a specific track (BE-1: Yehia)
+ */
+exports.removeLike = async (userId, trackId) => {
+  const track = await Track.findById(trackId);
+  if (!track) {
+    throw new AppError('Track not found', 404);
+  }
+
+  const existingInteraction = await Interaction.findOne({
+    actorId: userId,
+    targetId: trackId,
+    actionType: 'LIKE',
+  });
+
+  if (!existingInteraction) {
+    throw new AppError('You have not liked this track', 400);
+  }
+
+  // Delete interaction and decrement counter
+  await Interaction.findByIdAndDelete(existingInteraction._id);
+  await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: -1 } });
+
+  return { liked: false };
+};
+
+

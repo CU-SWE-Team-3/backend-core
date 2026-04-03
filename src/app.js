@@ -18,7 +18,7 @@ const playerRoutes = require('./routes/playerRoutes');
 
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
-
+const commentRoutes = require('./routes/commentRoutes');
 const app = express();
 app.set('trust proxy', 1); // Add this line right after initializing app
 // ==========================================
@@ -110,7 +110,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/tracks', trackRoutes);
 
 app.use('/api/player', playerRoutes);
-
+app.use('/api/comments', commentRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes

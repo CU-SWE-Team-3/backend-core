@@ -86,3 +86,27 @@ exports.getUserRepostsFeed = catchAsync(async (req, res) => {
     },
   });
 });
+
+
+// BE-1: Yehia's Like Controllers
+exports.createLike = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { id: trackId } = req.params;
+  const result = await interactionService.addLike(userId, trackId);
+  res.status(201).json({
+    success: true,
+    message: 'Track liked successfully',
+    data: result,
+  });
+});
+
+exports.deleteLike = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { id: trackId } = req.params;
+  const result = await interactionService.removeLike(userId, trackId);
+  res.status(200).json({
+    success: true,
+    message: 'Like removed successfully',
+    data: result,
+  });
+});
