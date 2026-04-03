@@ -4,6 +4,7 @@ const interactionController = require('../controllers/interactionController');
 const { protect } = require('../middlewares/authMiddleware'); // Make sure this path matches your auth middleware
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const commentController = require('../controllers/commentController');
+
 const router = express.Router();
 
 // ==========================================
@@ -59,8 +60,6 @@ router.get('/:id/likers', interactionController.getTrackLikers);
 // Yehia's Module 6 Routes (Likes)
 router.post('/:id/like', protect, interactionController.createLike);
 router.delete('/:id/like', protect, interactionController.deleteLike);
-
-
 
 // Yehia's Module 6 Routes (Comments on Tracks)
 router.post('/:trackId/comments', protect, commentController.createComment);

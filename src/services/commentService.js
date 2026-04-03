@@ -2,7 +2,13 @@ const Comment = require('../models/commentModel');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
 
-exports.addComment = async (userId, trackId, content, timestamp, parentCommentId = null) => {
+exports.addComment = async (
+  userId,
+  trackId,
+  content,
+  timestamp,
+  parentCommentId = null
+) => {
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('Track not found', 404);
 
@@ -10,8 +16,10 @@ exports.addComment = async (userId, trackId, content, timestamp, parentCommentId
   if (parentCommentId) {
     const parent = await Comment.findById(parentCommentId);
     if (!parent) throw new AppError('Parent comment not found', 404);
-    if (parent.parentComment) throw new AppError('Replies are restricted to one level deep', 400);
-    if (parent.track.toString() !== trackId) throw new AppError('Parent comment belongs to a different track', 400);
+    if (parent.parentComment)
+      throw new AppError('Replies are restricted to one level deep', 400);
+    if (parent.track.toString() !== trackId)
+      throw new AppError('Parent comment belongs to a different track', 400);
   }
 
   const newComment = await Comment.create({
@@ -19,7 +27,7 @@ exports.addComment = async (userId, trackId, content, timestamp, parentCommentId
     track: trackId,
     content,
     timestamp,
-    parentComment: parentCommentId || null
+    parentComment: parentCommentId || null,
   });
 
   await Track.findByIdAndUpdate(trackId, { $inc: { commentCount: 1 } });
@@ -36,16 +44,27 @@ exports.getTrackComments = async (trackId, page = 1, limit = 50) => {
     .limit(limit)
     .populate({
       path: 'user',
-      select: 'displayName permalink avatarUrl role isPremium'
+      select: 'displayName permalink avatarUrl role isPremium',
     })
     .populate({
       path: 'replies',
-      populate: { path: 'user', select: 'displayName permalink avatarUrl role isPremium' },
-      options: { sort: { createdAt: 1 } }
+      populate: {
+        path: 'user',
+        select: 'displayName permalink avatarUrl role isPremium',
+      },
+      options: { sort: { createdAt: 1 } },
     });
 
-  const total = await Comment.countDocuments({ track: trackId, parentComment: null });
-  return { comments, total, page: parseInt(page, 10), totalPages: Math.ceil(total / limit) };
+  const total = await Comment.countDocuments({
+    track: trackId,
+    parentComment: null,
+  });
+  return {
+    comments,
+    total,
+    page: parseInt(page, 10),
+    totalPages: Math.ceil(total / limit),
+  };
 };
 
 exports.deleteComment = async (userId, commentId) => {
@@ -54,7 +73,10 @@ exports.deleteComment = async (userId, commentId) => {
 
   // Ensure only the author can delete it
   if (comment.user.toString() !== userId.toString()) {
-    throw new AppError('You do not have permission to delete this comment', 403);
+    throw new AppError(
+      'You do not have permission to delete this comment',
+      403
+    );
   }
 
   // If it's a parent comment, delete its replies first
@@ -65,5 +87,7 @@ exports.deleteComment = async (userId, commentId) => {
   }
 
   await Comment.deleteOne({ _id: comment._id });
-  await Track.findByIdAndUpdate(comment.track, { $inc: { commentCount: -deletedCount } });
+  await Track.findByIdAndUpdate(comment.track, {
+    $inc: { commentCount: -deletedCount },
+  });
 };

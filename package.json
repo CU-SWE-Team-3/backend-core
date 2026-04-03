@@ -16,6 +16,7 @@
   "dependencies": {
     "@azure/storage-blob": "^12.31.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "axios": "^1.13.6",
     "bcrypt": "^6.0.0",

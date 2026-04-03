@@ -19,6 +19,7 @@ const playerRoutes = require('./routes/playerRoutes');
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
 const commentRoutes = require('./routes/commentRoutes');
+
 const app = express();
 app.set('trust proxy', 1); // Add this line right after initializing app
 // ==========================================
