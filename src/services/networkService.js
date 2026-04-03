@@ -12,10 +12,30 @@ exports.followUser = async (followerId, followingId) => {
   const userToFollow = await User.findById(followingId);
   if (!userToFollow) throw new Error('User not found.');
 
+  // ==========================================
+  // NEW: Check if there is a block in EITHER direction
+  // ==========================================
+  const existingBlock = await Block.findOne({
+    $or: [
+      { blocker: followerId, blocked: followingId }, // You blocked them
+      { blocker: followingId, blocked: followerId }, // They blocked you
+    ],
+  });
+
+  if (existingBlock) {
+    // Using AppError to return a proper 403 Forbidden status
+    throw new AppError(
+      'You cannot follow this user due to an active block.',
+      403
+    );
+  }
+  // ==========================================
+
   const existingFollow = await Follow.findOne({
     follower: followerId,
     following: followingId,
   });
+
   if (existingFollow) throw new Error('You are already following this user.');
 
   await Follow.create({ follower: followerId, following: followingId });
@@ -209,6 +229,7 @@ exports.blockUser = async (blockerId, blockedId) => {
     throw new AppError('You cannot block yourself', 400);
   }
 
+  // 1. Check if block already exists
   const existingBlock = await Block.findOne({
     blocker: blockerId,
     blocked: blockedId,
@@ -218,17 +239,73 @@ exports.blockUser = async (blockerId, blockedId) => {
     throw new AppError('User is already blocked', 409);
   }
 
+  // 2. Create the block
   await Block.create({ blocker: blockerId, blocked: blockedId });
 
-  await Follow.deleteMany({
-    $or: [
-      { follower: blockerId, following: blockedId },
-      { follower: blockedId, following: blockerId },
-    ],
+  // 3. Delete follow relationships and check if they existed
+  // Did the blocker follow the blocked user?
+  const followBlockerToBlocked = await Follow.findOneAndDelete({
+    follower: blockerId,
+    following: blockedId,
   });
-  // Note: BE-1 will need to update the User follower/following counts here later.
+
+  // Did the blocked user follow the blocker?
+  const followBlockedToBlocker = await Follow.findOneAndDelete({
+    follower: blockedId,
+    following: blockerId,
+  });
+
+  // 4. Prepare count decrements safely
+  const blockerInc = {};
+  const blockedInc = {};
+
+  if (followBlockerToBlocked) {
+    // Blocker unfollowed Blocked -> Blocker's following decreases, Blocked's followers decrease
+    blockerInc.followingCount = -1;
+    blockedInc.followerCount = -1;
+  }
+
+  if (followBlockedToBlocker) {
+    // Blocked unfollowed Blocker -> Blocker's followers decrease, Blocked's following decreases
+    blockerInc.followerCount = (blockerInc.followerCount || 0) - 1;
+    blockedInc.followingCount = (blockedInc.followingCount || 0) - 1;
+  }
+
+  // 5. Apply updates to the User models concurrently
+  const updatePromises = [];
+
+  if (Object.keys(blockerInc).length > 0) {
+    updatePromises.push(
+      User.findByIdAndUpdate(blockerId, { $inc: blockerInc })
+    );
+  }
+
+  if (Object.keys(blockedInc).length > 0) {
+    updatePromises.push(
+      User.findByIdAndUpdate(blockedId, { $inc: blockedInc })
+    );
+  }
+
+  if (updatePromises.length > 0) {
+    await Promise.all(updatePromises);
+  }
 
   return { status: 'blocked' };
+};
+
+exports.unblockUser = async (blockerId, blockedId) => {
+  const existingBlock = await Block.findOne({
+    blocker: blockerId,
+    blocked: blockedId,
+  });
+
+  if (!existingBlock) {
+    throw new AppError('User is not blocked', 404);
+  }
+
+  await Block.findByIdAndDelete(existingBlock._id);
+
+  return { status: 'unblocked' };
 };
 
 exports.unblockUser = async (blockerId, blockedId) => {
