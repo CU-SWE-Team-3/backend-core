@@ -37,23 +37,50 @@ exports.updatePrivacy = async (userId, isPrivate) => {
 };
 
 exports.updateSocialLinks = async (userId, socialLinks) => {
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { socialLinks },
-    { new: true, runValidators: true }
-  ).select('socialLinks');
-  if (!user) throw new Error('User not found');
-  return user;
+  const user = await User.findById(userId).select('socialLinks');
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const currentLinks = user.socialLinks.map((link) => ({
+    platform: link.platform,
+    url: link.url,
+  }));
+
+  const isIdentical =
+    JSON.stringify(currentLinks) === JSON.stringify(socialLinks);
+
+  if (isIdentical) {
+    throw new AppError(
+      'No changes detected. These social links are already saved.',
+      400
+    );
+  }
+
+  user.socialLinks = socialLinks;
+  await user.save({ validateModifiedOnly: true });
+
+  return { socialLinks: user.socialLinks };
 };
 
 exports.removeSocialLink = async (userId, linkId) => {
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { $pull: { socialLinks: { _id: linkId } } },
-    { new: true }
-  ).select('socialLinks');
-  if (!user) throw new Error('User not found');
-  return user;
+  const user = await User.findById(userId).select('socialLinks');
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const linkExists = user.socialLinks.id(linkId);
+
+  if (!linkExists) {
+    throw new AppError('Social link not found or already removed.', 404);
+  }
+
+  user.socialLinks.pull(linkId);
+  await user.save({ validateModifiedOnly: true });
+
+  return { socialLinks: user.socialLinks };
 };
 
 exports.updateTier = async (userId, role) => {
