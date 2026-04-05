@@ -23,3 +23,20 @@ jobs:
           context: .
           push: true
           tags: zkhaled389/biobeats-backend:latest
+
+  deploy:
+    name: Deploy to Azure Server
+    needs: build # This ensures it only deploys AFTER a successful build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute remote SSH commands to deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/biobeats-prod
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
