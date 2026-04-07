@@ -87,6 +87,24 @@ exports.getUserRepostsFeed = catchAsync(async (req, res) => {
   });
 });
 
+exports.getUserLikesFeed = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { page, limit } = req.query;
+  const result = await interactionService.getUserLikes(userId, page, limit);
+  res.status(200).json({
+    success: true,
+    message: 'User likes feed fetched successfully',
+    data: {
+      likedTracks: result.likedTracks,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
+      },
+    },
+  });
+});
+
 // BE-1: Yehia's Like Controllers
 exports.createLike = catchAsync(async (req, res) => {
   const userId = req.user.id;

@@ -16,6 +16,7 @@ router.delete(
 router.patch('/tier', protect, profileController.updateTier);
 
 router.get('/:userId/reposts', interactionController.getUserRepostsFeed);
+router.get('/:userId/likes', interactionController.getUserLikesFeed);
 
 router.get('/:permalink', profileController.getProfileByPermalink);
 router.patch('/update', protect, profileController.updateProfile);

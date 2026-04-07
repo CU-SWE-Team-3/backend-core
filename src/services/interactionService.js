@@ -151,6 +151,50 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
   };
 };
 
+exports.getUserLikes = async (userId, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+
+  const likeInteractions = await Interaction.find({
+    actorId: userId,
+    actionType: 'LIKE',
+  })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate({
+      path: 'targetId',
+      match: { processingState: 'Finished' },
+      // NEW: Added this select to prevent sending backend-only track data to the frontend
+      select:
+        'title coverArtUrl duration audioUrl playCount likeCount repostCount createdAt',
+      populate: {
+        path: 'artist',
+        // NEW: Also added role and isPremium here for the artist on the track card!
+        select: 'displayName permalink avatarUrl role isPremium',
+      },
+    });
+
+  const total = await Interaction.countDocuments({
+    actorId: userId,
+    actionType: 'LIKE',
+  });
+
+  // Filter out nulls (if a track was deleted) and format for frontend
+  const likedTracks = likeInteractions
+    .filter((interaction) => interaction.targetId != null)
+    .map((interaction) => ({
+      likeDate: interaction.createdAt,
+      track: interaction.targetId,
+    }));
+
+  return {
+    total,
+    page: parseInt(page, 10),
+    totalPages: Math.ceil(total / limit),
+    likedTracks,
+  };
+};
+
 /**
  * Adds a like for a user on a specific track (BE-1: Yehia)
  */
