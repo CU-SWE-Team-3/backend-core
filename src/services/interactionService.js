@@ -119,7 +119,7 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
     .limit(limit)
     .populate({
       path: 'targetId',
-      match: { processingState: 'Finished' },
+      match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
       // NEW: Added this select to prevent sending backend-only track data to the frontend
       select:
         'title coverArtUrl duration audioUrl playCount likeCount repostCount createdAt',
@@ -163,7 +163,7 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
     .limit(limit)
     .populate({
       path: 'targetId',
-      match: { processingState: 'Finished' },
+      match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
       // NEW: Added this select to prevent sending backend-only track data to the frontend
       select:
         'title coverArtUrl duration audioUrl playCount likeCount repostCount createdAt',

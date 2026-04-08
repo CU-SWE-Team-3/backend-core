@@ -14,6 +14,13 @@ exports.getStreamingData = async (trackId, user) => {
     throw new AppError('Track audio is still processing or unavailable', 400);
   }
 
+  if (
+    track.releaseDate > new Date() &&
+    track.artist.toString() !== user._id.toString()
+  ) {
+    throw new AppError('Track not found', 404);
+  }
+
   // This will automatically throw a 403 error if they are blocked.
   playbackService.checkAccessibility(user, track, 'stream');
 

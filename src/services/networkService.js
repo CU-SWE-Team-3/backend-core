@@ -100,6 +100,7 @@ exports.getUserFeed = async (userId) => {
     artist: { $in: followingIds },
     isPublic: true,
     processingState: 'Finished',
+    releaseDate: { $lte: new Date() },
   })
     .populate('artist', 'displayName permalink avatarUrl')
     .select(

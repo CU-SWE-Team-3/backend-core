@@ -1,7 +1,7 @@
 const express = require('express');
 const trackController = require('../controllers/trackController');
 const interactionController = require('../controllers/interactionController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, optionalAuth } = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const commentController = require('../controllers/commentController');
 const { validate } = require('../validations/validationMiddleware');
@@ -58,7 +58,12 @@ router.patch(
 router.get('/my-tracks', protect, trackController.getMyTracks);
 
 // ── Fetch & Stream ─────────────────────────────────────────────────────────────
-router.get('/:permalink', validate(getTrackSchema), trackController.getTrack);
+router.get(
+  '/:permalink',
+  optionalAuth,
+  validate(getTrackSchema),
+  trackController.getTrack
+);
 
 // ── Download & Delete ──────────────────────────────────────────────────────────
 router.get(
