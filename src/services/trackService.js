@@ -248,25 +248,16 @@ exports.confirmUpload = async (trackId, userId) => {
 };
 
 // 3. FETCH SINGLE TRACK (Public streaming)
-exports.getTrackByPermalink = async (permalink, requestingUser = null) => {
-  const track = await Track.findOne({ permalink });
+exports.getTrackByPermalink = async (permalink) => {
+  const track = await Track.findOne({ permalink })
+    .select('-audioUrl')
+    .populate('artist', 'displayName permalink avatarUrl isPremium');
 
   if (!track || track.processingState !== 'Finished') {
-    throw new AppError('Track not found.', 404);
+    throw new Error('Track not found or is still processing.');
   }
 
-  // Is the person asking the owner of this track?
-  const isOwner =
-    requestingUser &&
-    track.artist._id.toString() === requestingUser._id.toString();
-
-  // If release date is in the future, only the owner can see it
-  if (track.releaseDate > new Date() && !isOwner) {
-    throw new AppError('Track not found.', 404);
-  }
-
-  // If track is private, only the owner can see it
-  if (!track.isPublic && !isOwner) {
+  if (track.releaseDate > new Date()) {
     throw new AppError('Track not found.', 404);
   }
 
