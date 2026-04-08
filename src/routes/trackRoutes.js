@@ -1,34 +1,40 @@
 const express = require('express');
 const trackController = require('../controllers/trackController');
 const interactionController = require('../controllers/interactionController');
-const { protect } = require('../middlewares/authMiddleware'); // Make sure this path matches your auth middleware
+const { protect } = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const commentController = require('../controllers/commentController');
+const { validate } = require('../validations/validationMiddleware');
+const {
+  initiateUploadSchema,
+  confirmUploadSchema,
+  updateMetadataSchema,
+  updateVisibilitySchema,
+  getTrackSchema,
+  trackIdParamSchema,
+} = require('../validations/trackValidation');
+const {
+  trackInteractionSchema,
+  trackEngagersSchema,
+  createCommentSchema,
+  getCommentsSchema,
+} = require('../validations/interactionValidation');
 
 const router = express.Router();
 
-// ==========================================
-// BE-3: METADATA & VISIBILITY ROUTES
-// ==========================================
-
-/**
- * @route   PATCH /api/tracks/:id/metadata
- * @desc    Update track metadata
- * @access  Private
- */
-router.patch('/:id/metadata', protect, trackController.updateMetadata);
-
-/**
- * @route   PATCH /api/tracks/:id/visibility
- * @desc    Toggle track visibility
- * @access  Private
- */
-router.patch('/:id/visibility', protect, trackController.updateVisibility);
-/**
- * @route   PATCH /api/tracks/:id/artwork
- * @desc    Upload track cover photo
- * @access  Private
- */
+// ── Metadata & Visibility ──────────────────────────────────────────────────────
+router.patch(
+  '/:id/metadata',
+  protect,
+  validate(updateMetadataSchema),
+  trackController.updateMetadata
+);
+router.patch(
+  '/:id/visibility',
+  protect,
+  validate(updateVisibilitySchema),
+  trackController.updateVisibility
+);
 router.patch(
   '/:id/artwork',
   protect,
@@ -36,33 +42,86 @@ router.patch(
   trackController.uploadArtwork
 );
 
-// 1. Direct-to-Cloud Upload Pipeline
-router.post('/upload', protect, trackController.initiateUpload);
-router.patch('/:id/confirm', protect, trackController.confirmUpload);
+// ── Upload Pipeline ────────────────────────────────────────────────────────────
+router.post(
+  '/upload',
+  protect,
+  validate(initiateUploadSchema),
+  trackController.initiateUpload
+);
+router.patch(
+  '/:id/confirm',
+  protect,
+  validate(confirmUploadSchema),
+  trackController.confirmUpload
+);
 router.get('/my-tracks', protect, trackController.getMyTracks);
 
-// 2. Fetch & Stream (Public)
-router.get('/:permalink', trackController.getTrack);
+// ── Fetch & Stream ─────────────────────────────────────────────────────────────
+router.get('/:permalink', validate(getTrackSchema), trackController.getTrack);
 
-// 3. Premium Offline Download (Protected)
-router.get('/:id/download', protect, trackController.downloadTrack);
+// ── Download & Delete ──────────────────────────────────────────────────────────
+router.get(
+  '/:id/download',
+  protect,
+  validate(trackIdParamSchema),
+  trackController.downloadTrack
+);
+router.delete(
+  '/:id',
+  protect,
+  validate(trackIdParamSchema),
+  trackController.deleteTrack
+);
 
-// 4. Delete Track (Protected - Owner only)
-router.delete('/:id', protect, trackController.deleteTrack);
+// ── Interactions (Module 6) ────────────────────────────────────────────────────
+router.post(
+  '/:id/repost',
+  protect,
+  validate(trackInteractionSchema),
+  interactionController.createRepost
+);
+router.delete(
+  '/:id/repost',
+  protect,
+  validate(trackInteractionSchema),
+  interactionController.deleteRepost
+);
+router.get(
+  '/:id/reposters',
+  validate(trackEngagersSchema),
+  interactionController.getTrackReposters
+);
+router.get(
+  '/:id/likers',
+  validate(trackEngagersSchema),
+  interactionController.getTrackLikers
+);
 
-// Hossam's Module 6 Routes
-router.post('/:id/repost', protect, interactionController.createRepost);
-router.delete('/:id/repost', protect, interactionController.deleteRepost);
+router.post(
+  '/:id/like',
+  protect,
+  validate(trackInteractionSchema),
+  interactionController.createLike
+);
+router.delete(
+  '/:id/like',
+  protect,
+  validate(trackInteractionSchema),
+  interactionController.deleteLike
+);
 
-router.get('/:id/reposters', interactionController.getTrackReposters);
-router.get('/:id/likers', interactionController.getTrackLikers);
-
-// Yehia's Module 6 Routes (Likes)
-router.post('/:id/like', protect, interactionController.createLike);
-router.delete('/:id/like', protect, interactionController.deleteLike);
-
-// Yehia's Module 6 Routes (Comments on Tracks)
-router.post('/:trackId/comments', protect, commentController.createComment);
-router.get('/:trackId/comments', commentController.getTrackComments); // Public viewing
+// ── Comments (Module 6) ────────────────────────────────────────────────────────
+router.post(
+  '/:trackId/comments',
+  protect,
+  validate(createCommentSchema),
+  commentController.createComment
+);
+router.get(
+  '/:trackId/comments',
+  validate(getCommentsSchema),
+  commentController.getTrackComments
+);
 
 module.exports = router;

@@ -1,16 +1,25 @@
 const express = require('express');
 const historyController = require('../controllers/historyController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { validate } = require('../validations/validationMiddleware');
+const {
+  updateProgressSchema,
+  recentlyPlayedSchema,
+} = require('../validations/playerValidation');
 
 const router = express.Router();
 
-// Protect all history routes - users must be logged in to track or view history
 router.use(authMiddleware.protect);
 
-// Route to update playback progress
-router.post('/progress', historyController.updateProgress);
-
-// Route to fetch recently played tracks
-router.get('/recently-played', historyController.getRecentlyPlayed);
+router.post(
+  '/progress',
+  validate(updateProgressSchema),
+  historyController.updateProgress
+);
+router.get(
+  '/recently-played',
+  validate(recentlyPlayedSchema),
+  historyController.getRecentlyPlayed
+);
 
 module.exports = router;

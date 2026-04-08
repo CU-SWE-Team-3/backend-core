@@ -1,29 +1,57 @@
 const express = require('express');
 const networkController = require('../controllers/networkController');
-
-// Import your auth middleware (Make sure this matches your team's exact file/function name)
 const { protect } = require('../middlewares/authMiddleware');
+const { validate } = require('../validations/validationMiddleware');
+const {
+  followSchema,
+  blockSchema,
+  getUserNetworkSchema,
+  getSuggestedSchema,
+} = require('../validations/networkValidation');
 
 const router = express.Router();
 
-router.get('/:userId/followers', networkController.getFollowers);
-router.get('/:userId/following', networkController.getFollowing);
+router.get(
+  '/:userId/followers',
+  validate(getUserNetworkSchema),
+  networkController.getFollowers
+);
+router.get(
+  '/:userId/following',
+  validate(getUserNetworkSchema),
+  networkController.getFollowing
+);
+
 router.use(protect);
 
 router.get('/feed', networkController.getFeed);
-
-router.post('/:id/follow', networkController.followUser);
-
-// DELETE: /api/users/:id/unfollow -> Unfollow a user
-router.delete('/:id/follow', networkController.unfollowUser);
-
-router.get('/suggested', networkController.getSuggestedUsers);
+router.get(
+  '/suggested',
+  validate(getSuggestedSchema),
+  networkController.getSuggestedUsers
+);
 router.get('/blocked-users', networkController.getBlockedUsers);
 
-// ==========================================
-// 3.(Block / Unblock)
-// ==========================================
-router.post('/:userId/block', networkController.blockUser);
-router.delete('/:userId/block', networkController.unblockUser);
+router.post(
+  '/:id/follow',
+  validate(followSchema),
+  networkController.followUser
+);
+router.delete(
+  '/:id/follow',
+  validate(followSchema),
+  networkController.unfollowUser
+);
+
+router.post(
+  '/:userId/block',
+  validate(blockSchema),
+  networkController.blockUser
+);
+router.delete(
+  '/:userId/block',
+  validate(blockSchema),
+  networkController.unblockUser
+);
 
 module.exports = router;
