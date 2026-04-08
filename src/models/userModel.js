@@ -3,6 +3,31 @@ const bcrypt = require('bcrypt');
 const slug = require('mongoose-slug-updater');
 
 mongoose.plugin(slug);
+const VALID_COUNTRIES = [
+  '', // CRITICAL: Allows empty string for default users
+  'Egypt',
+  'United States',
+  'United Kingdom',
+  'Canada',
+  'Australia',
+  'Germany',
+  'France',
+  'Japan',
+  'Brazil',
+  'Saudi Arabia',
+  'United Arab Emirates',
+  'Morocco',
+  'South Africa',
+  'Spain',
+  'Italy',
+  'Netherlands',
+  'Sweden',
+  'India',
+  'China',
+  'South Korea',
+  'Argentina',
+  'Mexico',
+];
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -58,7 +83,14 @@ const userSchema = new mongoose.Schema(
       maxLength: [500, 'Bio cannot exceed 500 characters'],
       default: '',
     },
-    country: { type: String, default: '' },
+    country: {
+      type: String,
+      enum: {
+        values: VALID_COUNTRIES,
+        message: 'Please select a valid country from the list',
+      },
+      default: '',
+    },
     city: { type: String, default: '' },
     genres: [{ type: String, trim: true }],
 
