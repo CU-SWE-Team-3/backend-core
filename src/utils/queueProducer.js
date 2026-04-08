@@ -24,7 +24,7 @@ const channelWrapper = connection.createChannel({
     await channel.bindQueue(dlq, dlx, 'failed_audio');
 
     // Setup Main Queue and link it to the DLX
-    const queueName = 'audio_processing_queue_v2';
+    const queueName = 'audio_processing_queue_v3';
     return channel.assertQueue(queueName, {
       durable: true,
       arguments: {

@@ -4,6 +4,34 @@ const slug = require('mongoose-slug-updater');
 
 mongoose.plugin(slug);
 
+const validGenres = [
+  'All music genres',
+  'Alternative Rock',
+  'Ambient',
+  'Classical',
+  'Country',
+  'Dance & EDM',
+  'Deep house',
+  'Drum & Bass',
+  'Electronic',
+  'Hiphop & rap',
+  'House',
+  'Indie',
+  'Jazz & blues',
+  'Latin',
+  'Metal',
+  'Pop',
+  'R&B & soul',
+  'Reggae',
+  'Rock',
+  'Soundtrack',
+  'Techno',
+  'Trance',
+  'Trap',
+  'Arabic',
+  'Islamic',
+];
+
 const trackSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -37,6 +65,10 @@ const trackSchema = new mongoose.Schema(
     genre: {
       type: String,
       trim: true,
+      enum: {
+        values: validGenres,
+        message: 'Please select a valid genre',
+      },
     },
     tags: [
       {

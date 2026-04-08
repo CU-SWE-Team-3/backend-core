@@ -48,12 +48,12 @@ exports.getMyTracks = catchAsync(async (req, res, next) => {
 
 exports.updateMetadata = catchAsync(async (req, res) => {
   const trackId = req.params.id;
-  const userId = req.user._id || req.user.id;
+  const { user } = req; // We changed this to pass the full user object
   const metadataBody = req.body;
 
   const updatedTrack = await trackService.updateTrackMetadata(
     trackId,
-    userId,
+    user,
     metadataBody
   );
 

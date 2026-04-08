@@ -21,8 +21,7 @@ const AppError = require('../utils/appError');
 /**
  * Updates track metadata (title, description, genre, tags, releaseDate)
  */
-exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
-  // 1. Filter the input so users can't secretly update BE-2's audioUrl or status
+exports.updateTrackMetadata = async (trackId, user, metadataBody) => {
   const allowedUpdates = {};
   const allowedFields = [
     'title',
@@ -30,6 +29,7 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
     'genre',
     'tags',
     'releaseDate',
+    'isPublic',
   ];
 
   allowedFields.forEach((field) => {
@@ -38,18 +38,27 @@ exports.updateTrackMetadata = async (trackId, userId, metadataBody) => {
     }
   });
 
-  // 2. Use findOneAndUpdate exactly like the User Profile service!
-  // This does three things at once:
-  // - Finds the track by its ID
-  // - Verifies ownership in the same query ({ artist: userId })
-  // - TRIGGERS THE SLUG PLUGIN AUTOMATICALLY!
+  // ARTIST PRO CHECK: Scheduled Release Logic
+  if (allowedUpdates.releaseDate) {
+    const scheduledDate = new Date(allowedUpdates.releaseDate);
+    const now = new Date();
+
+    if (scheduledDate > now) {
+      if (!user.isPremium) {
+        throw new AppError(
+          'Scheduling a future release requires an Artist Pro subscription.',
+          403
+        );
+      }
+    }
+  }
+
   const track = await Track.findOneAndUpdate(
-    { _id: trackId, artist: userId },
+    { _id: trackId, artist: user._id },
     { $set: allowedUpdates },
     { new: true, runValidators: true }
   );
 
-  // 3. If no track was returned, it either doesn't exist or they don't own it
   if (!track) {
     throw new AppError(
       'Track not found or you do not have permission to edit it',
@@ -120,8 +129,17 @@ exports.updateTrackArtwork = async (trackId, userId, file) => {
 
 // 1. GENERATE SAS TOKEN & CHECK LIMITS
 exports.generateUploadUrl = async (user, trackData) => {
-  const { title, format, size, duration } = trackData;
-
+  const {
+    title,
+    format,
+    size,
+    duration,
+    description,
+    genre,
+    tags,
+    isPublic,
+    releaseDate,
+  } = trackData;
   // Module 12: Premium Subscriptions (Upload Limit Check)
   if (!user.isPremium) {
     const trackCount = await Track.countDocuments({ artist: user._id });
@@ -131,6 +149,17 @@ exports.generateUploadUrl = async (user, trackData) => {
         403
       );
     }
+  }
+
+  const canScheduleRelease = user.role === 'Artist' || user.isPremium === true;
+  // 2. Determine the final release date based on their account type
+  let finalReleaseDate;
+  if (canScheduleRelease && releaseDate) {
+    // If they are Pro/Artist AND they sent a date, respect it
+    finalReleaseDate = releaseDate;
+  } else {
+    // Otherwise, force it to 'now' (ignoring any future date they tried to sneak in)
+    finalReleaseDate = Date.now();
   }
 
   const ALLOWED_FORMATS = [
@@ -183,6 +212,11 @@ exports.generateUploadUrl = async (user, trackData) => {
     duration: Math.round(duration),
     audioUrl: finalAudioUrl,
     processingState: 'Processing',
+    description: description,
+    genre: genre,
+    tags: tags,
+    isPublic: isPublic !== undefined ? isPublic : true,
+    releaseDate: finalReleaseDate,
   });
 
   return { trackId: newTrack._id, uploadUrl };
@@ -207,7 +241,7 @@ exports.confirmUpload = async (trackId, userId) => {
 
   // 3. Drop the ticket into the RabbitMQ queue!
   // It only takes ~50 milliseconds to send this to the cloud.
-  await publishToQueue('audio_processing_queue_v2', ticketData);
+  await publishToQueue('audio_processing_queue_v3', ticketData);
 
   // 4. Return immediately to the user so the frontend doesn't hang
   return track;
