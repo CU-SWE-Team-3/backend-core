@@ -22,6 +22,34 @@ const ALLOWED_AUDIO_FORMATS = [
   'audio/wave',
 ];
 
+const ALLOWED_GENRES = [
+  'All music genres',
+  'Alternative Rock',
+  'Ambient',
+  'Classical',
+  'Country',
+  'Dance & EDM',
+  'Deep house',
+  'Drum & Bass',
+  'Electronic',
+  'Hiphop & rap',
+  'House',
+  'Indie',
+  'Jazz & blues',
+  'Latin',
+  'Metal',
+  'Pop',
+  'R&B & soul',
+  'Reggae',
+  'Rock',
+  'Soundtrack',
+  'Techno',
+  'Trance',
+  'Trap',
+  'Arabic',
+  'Islamic',
+];
+
 const mongoIdParam = (label = 'Track ID') => ({
   required: true,
   type: 'mongoId',
@@ -55,7 +83,7 @@ const initiateUploadSchema = {
       type: 'number',
       min: 1,
       minMessage: 'File size must be greater than 0 bytes',
-      max: 500 * 1024 * 1024, // 500 MB hard cap
+      max: 500 * 1024 * 1024,
       maxMessage: 'File size must not exceed 500 MB',
     },
     duration: {
@@ -63,8 +91,52 @@ const initiateUploadSchema = {
       type: 'number',
       min: 1,
       minMessage: 'Track duration must be at least 1 second',
-      max: 10800, // 3 hours
+      max: 10800,
       maxMessage: 'Track duration must not exceed 3 hours',
+    },
+    description: {
+      required: false,
+      type: 'string',
+      maxLength: 1000,
+      maxLengthMessage: 'Description must not exceed 1000 characters',
+    },
+    genre: {
+      required: false,
+      type: 'string',
+      enum: ALLOWED_GENRES,
+      enumMessage: 'Invalid genre selected.',
+    },
+    tags: {
+      required: false,
+      type: 'array',
+      maxItems: 20,
+      maxItemsMessage: 'You can add at most 20 tags',
+      itemType: 'string',
+      itemTypeMessage: 'Each tag must be a string',
+      custom: (tags) => {
+        if (!Array.isArray(tags)) return null;
+        const hasInvalidTag = tags.some(
+          (tag) => typeof tag === 'string' && tag.trim().length > 30
+        );
+        if (hasInvalidTag) return 'Each tag must not exceed 30 characters';
+        return null;
+      },
+    },
+    isPublic: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'isPublic must be true (Public) or false (Private)',
+    },
+    releaseDate: {
+      required: false,
+      type: 'string',
+      custom: (v) => {
+        if (!v) return null;
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime()))
+          return 'releaseDate must be a valid date';
+        return null;
+      },
     },
   },
 };
@@ -104,8 +176,8 @@ const updateMetadataSchema = {
     genre: {
       required: false,
       type: 'string',
-      maxLength: 50,
-      maxLengthMessage: 'Genre must not exceed 50 characters',
+      enum: ALLOWED_GENRES,
+      enumMessage: 'Invalid genre selected.',
     },
     tags: {
       required: false,
@@ -125,6 +197,11 @@ const updateMetadataSchema = {
         return null;
       },
     },
+    isPublic: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'isPublic must be true (Public) or false (Private)',
+    },
     releaseDate: {
       required: false,
       type: 'string',
@@ -138,7 +215,6 @@ const updateMetadataSchema = {
     },
   },
 };
-
 /**
  * PATCH /api/tracks/:id/visibility
  */
