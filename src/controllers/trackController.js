@@ -141,14 +141,16 @@ exports.confirmUpload = catchAsync(async (req, res, next) => {
 
 exports.getTrack = catchAsync(async (req, res, next) => {
   const { permalink } = req.params;
-  const track = await trackService.getTrackByPermalink(permalink);
+  const track = await trackService.getTrackByPermalink(
+    permalink,
+    req.user || null
+  ); // ← pass the user too
 
   res.status(200).json({
     success: true,
     data: { track: formatTrack(track) },
   });
 });
-
 exports.downloadTrack = catchAsync(async (req, res) => {
   const { stream, contentLength, filename } =
     await trackService.downloadTrackAudio(req.params.id, req.user);

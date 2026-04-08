@@ -257,6 +257,10 @@ exports.getTrackByPermalink = async (permalink) => {
     throw new Error('Track not found or is still processing.');
   }
 
+  if (track.releaseDate > new Date()) {
+    throw new AppError('Track not found.', 404);
+  }
+
   return track;
 };
 
