@@ -53,7 +53,7 @@ app.use((req, res, next) => {
 // Limit requests from same IP (Brute Force Protection)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests
+  max: 1000000, // limit each IP to 1000 requests
 
   // COMPLETELY DELETE the `keyGenerator` and `validate` lines!
   // The rate limiter will just use its default, safe IP checker now.

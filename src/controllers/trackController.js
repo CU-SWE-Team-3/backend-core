@@ -141,14 +141,16 @@ exports.confirmUpload = catchAsync(async (req, res, next) => {
 
 exports.getTrack = catchAsync(async (req, res, next) => {
   const { permalink } = req.params;
-  const track = await trackService.getTrackByPermalink(
-    permalink,
-    req.user || null
-  ); // ← pass the user too
+
+  // If the user is logged in (authMiddleware), grab their ID. If not, it's null.
+  const userId = req.user ? req.user._id : null;
+
+  // Pass BOTH the permalink and the userId to the service
+  const track = await trackService.getTrackByPermalink(permalink, userId);
 
   res.status(200).json({
     success: true,
-    data: { track: formatTrack(track) },
+    data: { track },
   });
 });
 exports.downloadTrack = catchAsync(async (req, res) => {

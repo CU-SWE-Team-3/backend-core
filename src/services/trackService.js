@@ -248,17 +248,35 @@ exports.confirmUpload = async (trackId, userId) => {
 };
 
 // 3. FETCH SINGLE TRACK (Public streaming)
-exports.getTrackByPermalink = async (permalink) => {
+exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   const track = await Track.findOne({ permalink })
     .select('-audioUrl')
     .populate('artist', 'displayName permalink avatarUrl isPremium');
 
   if (!track || track.processingState !== 'Finished') {
-    throw new Error('Track not found or is still processing.');
+    throw new AppError('Track not found or is still processing.', 404);
   }
 
   if (track.releaseDate > new Date()) {
     throw new AppError('Track not found.', 404);
+  }
+
+  // ==========================================
+  // NEW SECURITY LOGIC: PROTECT PRIVATE TRACKS
+  // ==========================================
+
+  // Assuming your database uses `isPublic: false` to mark private tracks
+  if (track.isPublic === false) {
+    // Check if the user is logged in AND their ID matches the artist's ID
+    // We use .toString() because Mongoose ObjectIds can fail basic === comparisons
+    const isOwner =
+      requestingUserId &&
+      track.artist._id.toString() === requestingUserId.toString();
+
+    if (!isOwner) {
+      // Throw 403 Forbidden (or 404 so people don't even know it exists)
+      throw new AppError('This track is private and cannot be accessed.', 403);
+    }
   }
 
   return track;
