@@ -45,3 +45,43 @@ exports.protect = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+exports.optionalAuth = catchAsync(async (req, res, next) => {
+  let token;
+
+  // 1. Check if token exists in cookies or headers
+  if (req.cookies && req.cookies.accessToken) {
+    token = req.cookies.accessToken;
+  } else if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  // 2. If NO token, they are a guest. Do NOT throw an error. Just move to next()
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  // 3. If they DO have a token, try to verify it
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const currentUser = await User.findById(decoded.id);
+
+    // If user was deleted since token was made, treat as guest
+    if (!currentUser) {
+      req.user = null;
+      return next();
+    }
+
+    // Success! Attach the user to the request
+    req.user = currentUser;
+    next();
+  } catch (error) {
+    // If token is invalid or expired, just treat them as a guest instead of crashing
+    req.user = null;
+    next();
+  }
+});
