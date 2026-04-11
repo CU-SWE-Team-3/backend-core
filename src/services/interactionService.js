@@ -122,7 +122,7 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
       match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
       // NEW: Added this select to prevent sending backend-only track data to the frontend
       select:
-        'title coverArtUrl duration audioUrl playCount likeCount repostCount createdAt',
+        'title coverArtUrl duration audioUrl waveform playCount likeCount repostCount createdAt',
       populate: {
         path: 'artist',
         // NEW: Also added role and isPremium here for the artist on the track card!
@@ -166,7 +166,7 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
       match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
       // NEW: Added this select to prevent sending backend-only track data to the frontend
       select:
-        'title coverArtUrl duration audioUrl playCount likeCount repostCount createdAt',
+        'title coverArtUrl duration audioUrl waveform playCount likeCount repostCount createdAt',
       populate: {
         path: 'artist',
         // NEW: Also added role and isPremium here for the artist on the track card!
