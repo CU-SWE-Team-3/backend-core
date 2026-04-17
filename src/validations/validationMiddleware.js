@@ -23,6 +23,15 @@ const isArray = (v) => Array.isArray(v);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MONGO_ID_RE = /^[a-f\d]{24}$/i;
 
+const typeMap = {
+  string: isString,
+  number: isNumber,
+  boolean: isBoolean,
+  array: isArray,
+  mongoId: (v) => isString(v) && MONGO_ID_RE.test(v),
+  email: (v) => isString(v) && EMAIL_RE.test(v),
+};
+
 // ─── Field Rule Runner ─────────────────────────────────────────────────────────
 
 /**
@@ -48,14 +57,6 @@ const runFieldRules = (value, rules, field) => {
 
   // type
   if (rules.type) {
-    const typeMap = {
-      string: isString,
-      number: isNumber,
-      boolean: isBoolean,
-      array: isArray,
-      mongoId: (v) => isString(v) && MONGO_ID_RE.test(v),
-      email: (v) => isString(v) && EMAIL_RE.test(v),
-    };
     const checker = typeMap[rules.type];
     if (checker && !checker(value)) {
       return rules.typeMessage || `${field} must be a valid ${rules.type}`;
@@ -101,7 +102,10 @@ const runFieldRules = (value, rules, field) => {
       );
     }
     if (rules.itemType) {
-      const allValid = value.every((item) => typeof item === rules.itemType);
+      const itemChecker = typeMap[rules.itemType];
+      const allValid = itemChecker
+        ? value.every((item) => itemChecker(item))
+        : false;
       if (!allValid) {
         return (
           rules.itemTypeMessage ||
