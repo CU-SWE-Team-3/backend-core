@@ -118,7 +118,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'default-cover.png',
     },
-
+//payment details
+    stripeCustomerId: { type: String },
+  stripeSubscriptionId: { type: String },
     // ==========================================
     // 3. ROLES, PRIVACY & STATUS (BE-4)
     // ==========================================
@@ -203,5 +205,7 @@ userSchema.methods.toJSON = function () {
   delete userObject.__v;
   return userObject;
 };
+
+
 
 module.exports = mongoose.model('User', userSchema);
