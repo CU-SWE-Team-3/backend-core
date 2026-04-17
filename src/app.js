@@ -16,6 +16,8 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const playerRoutes = require('./routes/playerRoutes');
 
+const adminRoutes = require('./routes/adminRoutes');
+
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
 const commentRoutes = require('./routes/commentRoutes');
@@ -112,6 +114,7 @@ app.use('/api/tracks', trackRoutes);
 
 app.use('/api/player', playerRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/admin', adminRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes
