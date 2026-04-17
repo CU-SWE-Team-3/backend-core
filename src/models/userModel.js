@@ -136,6 +136,24 @@ const userSchema = new mongoose.Schema(
       default: 'Active',
     },
 
+    // yehia module 12
+  subscriptionPlan: {
+  type: String,
+  enum: ['Free', 'Pro', 'Go+'],
+  default: 'Free'
+},
+subscriptionExpiresAt: {
+  type: Date,
+  default: null
+},
+mockStripeId: {
+  type: String,
+  default: null
+},
+cancelAtPeriodEnd: {
+  type: Boolean,
+  default: false
+},
     // ==========================================
     // BE-1: VERIFICATION & RECOVERY TOKENS
     // ==========================================

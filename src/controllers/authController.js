@@ -21,17 +21,22 @@ const attachAuthCookies = (res, token, refreshToken) => {
 
 // Consistent user shape for every auth response
 // Frontend always gets same fields — no second request needed
-const formatUser = (user) => ({
-  _id: user._id,
-  displayName: user.displayName,
-  permalink: user.permalink,
-  avatarUrl: user.avatarUrl,
-  role: user.role,
-  isEmailVerified: user.isEmailVerified,
-  isPremium: user.isPremium,
-  followerCount: user.followerCount,
-  followingCount: user.followingCount,
-});
+const formatUser = (user) => {
+  return {
+    _id: user._id,
+    displayName: user.displayName,
+    permalink: user.permalink,
+    avatarUrl: user.avatarUrl,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,  
+    isPremium: user.isPremium,
+    subscriptionPlan: user.subscriptionPlan,       // <-- Added this yzs
+    subscriptionExpiresAt: user.subscriptionExpiresAt, // <-- Added this yz
+    cancelAtPeriodEnd: user.cancelAtPeriodEnd,     // <-- Added this yz
+    followerCount: user.followerCount,
+    followingCount: user.followingCount
+  };
+};
 
 exports.refreshToken = catchAsync(async (req, res, next) => {
   const refreshToken =

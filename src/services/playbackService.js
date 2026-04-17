@@ -91,11 +91,12 @@ exports.checkAccessibility = (user, track, action = 'stream') => {
     return true;
   }
 
-  // 3. Handle Offline Listening / Downloading (Premium Plan Only)
+  // 3. Handle Offline Listening / Downloading (Go+ Plan Only)
   if (action === 'download') {
-    if (!user.isPremium) {
+    // STRICT SEPARATION: Only 'Go+' users get offline listening
+    if (user.subscriptionPlan !== 'Go+') {
       throw new AppError(
-        'Offline listening and downloading are only available on the Premium Plan.',
+        'Requires a Go+ Subscription for offline listening.',
         403
       );
     }
