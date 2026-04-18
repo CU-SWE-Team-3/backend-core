@@ -44,7 +44,8 @@ exports.updateTrackMetadata = async (trackId, user, metadataBody) => {
     const now = new Date();
 
     if (scheduledDate > now) {
-      if (!user.isPremium) {
+      // STRICT SEPARATION: Only 'Pro' users can schedule future releases
+      if (user.subscriptionPlan !== 'Pro') {
         throw new AppError(
           'Scheduling a future release requires an Artist Pro subscription.',
           403
@@ -141,26 +142,26 @@ exports.generateUploadUrl = async (user, trackData) => {
     releaseDate,
   } = trackData;
   // Module 12: Premium Subscriptions (Upload Limit Check)
-  if (!user.isPremium) {
+  // ONLY Pro users bypass the limit
+  if (user.subscriptionPlan !== 'Pro') { 
     const trackCount = await Track.countDocuments({ artist: user._id });
     if (trackCount >= 3) {
       throw new AppError(
-        'Upload limit reached. Free accounts are limited to 3 tracks. Please upgrade to Pro.',
+        'Upload limit reached. Free and Go+ accounts are limited to 3 tracks. Please upgrade to Pro.',
         403
       );
     }
   }
 
-  const canScheduleRelease = user.role === 'Artist' || user.isPremium === true;
-  // 2. Determine the final release date based on their account type
+  // Determine the final release date based on their account type
+  const canScheduleRelease = user.subscriptionPlan === 'Pro';
   let finalReleaseDate;
   if (canScheduleRelease && releaseDate) {
-    // If they are Pro/Artist AND they sent a date, respect it
     finalReleaseDate = releaseDate;
   } else {
-    // Otherwise, force it to 'now' (ignoring any future date they tried to sneak in)
     finalReleaseDate = Date.now();
   }
+
 
   const ALLOWED_FORMATS = [
     'audio/mpeg',
@@ -292,11 +293,13 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   return track;
 };
 
+
 // 4. DOWNLOAD TRACK (Module 12: Premium Offline Listening)
 exports.downloadTrackAudio = async (trackId, user) => {
-  if (!user.isPremium) {
+  // ONLY Go+ users get offline listening
+  if (user.subscriptionPlan !== 'Go+') { 
     throw new AppError(
-      'Requires Premium Subscription (Go+ or Pro) for offline listening.',
+      'Requires a Go+ Subscription for offline listening.',
       403
     );
   }

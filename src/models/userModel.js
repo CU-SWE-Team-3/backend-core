@@ -118,7 +118,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'default-cover.png',
     },
-
+//payment details
+    stripeCustomerId: { type: String },
+  stripeSubscriptionId: { type: String },
     // ==========================================
     // 3. ROLES, PRIVACY & STATUS (BE-4)
     // ==========================================
@@ -136,6 +138,24 @@ const userSchema = new mongoose.Schema(
       default: 'Active',
     },
 
+    // yehia module 12
+  subscriptionPlan: {
+  type: String,
+  enum: ['Free', 'Pro', 'Go+'],
+  default: 'Free'
+},
+subscriptionExpiresAt: {
+  type: Date,
+  default: null
+},
+mockStripeId: {
+  type: String,
+  default: null
+},
+cancelAtPeriodEnd: {
+  type: Boolean,
+  default: false
+},
     // ==========================================
     // BE-1: VERIFICATION & RECOVERY TOKENS
     // ==========================================
@@ -185,5 +205,7 @@ userSchema.methods.toJSON = function () {
   delete userObject.__v;
   return userObject;
 };
+
+
 
 module.exports = mongoose.model('User', userSchema);

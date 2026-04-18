@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const path = require('path');
+const subscriptionController = require('./controllers/subscriptionController');
 // const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
@@ -22,6 +23,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
 const commentRoutes = require('./routes/commentRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 const app = express();
 app.set('trust proxy', 1); // Add this line right after initializing app
@@ -63,6 +65,17 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// ==========================================
+// THE STRIPE WEBHOOK (MUST BE ABOVE EXPRESS.JSON)
+// ==========================================
+// We use express.raw() here because Stripe needs the raw buffer to verify the secure signature!
+app.post(
+  '/api/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  subscriptionController.stripeWebhook // <--- Make sure this points to your actual webhook function!
+);
+
+
 // Body parser, reading data from body into req.body (Prevents large payload attacks)
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser()); // <--- NEW: Allows Express to read incoming cookies
@@ -92,6 +105,11 @@ app.use(mongoSanitize());
 //   })
 // );
 
+
+
+
+
+
 // ==========================================
 // 2. ROUTES
 // ==========================================
@@ -116,6 +134,8 @@ app.use('/api/tracks', trackRoutes);
 app.use('/api/player', playerRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
+
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)

@@ -1,8 +1,12 @@
 const cron = require('node-cron');
 const Track = require('../models/trackModel');
 const AppError = require('./appError');
+const User = require('../models/userModel');
 
 const startCronJobs = () => {
+  // --------------------------------------------------------
+  // 1. Abandoned Track Cleanup Cron (Runs daily at Midnight)
+  // --------------------------------------------------------
   cron.schedule('0 0 * * *', async () => {
     console.log('[Cron] Running daily cleanup for abandoned track uploads...');
     try {
@@ -24,6 +28,37 @@ const startCronJobs = () => {
       console.error('[Cron Error]', appError.message, error);
     }
   });
+
+  // --------------------------------------------------------
+  // 2. Subscription Expiry Cron (Runs daily at 1:00 AM)
+  // --------------------------------------------------------
+  cron.schedule('0 1 * * *', async () => {
+    try {
+      const now = new Date();
+      const expiredUsers = await User.updateMany(
+        { 
+          isPremium: true, 
+          cancelAtPeriodEnd: true, 
+          subscriptionExpiresAt: { $lte: now } 
+        },
+        { 
+          $set: { 
+            isPremium: false, 
+            subscriptionPlan: 'Free',
+            mockStripeId: null,
+            subscriptionExpiresAt: null,
+            cancelAtPeriodEnd: false
+          } 
+        }
+      );
+      if (expiredUsers.modifiedCount > 0) {
+        console.log(`[Cron] Demoted ${expiredUsers.modifiedCount} expired premium subscriptions.`);
+      }
+    } catch (error) {
+      console.error('[Cron Error] Failed to process subscription expirations:', error);
+    }
+  });
 };
 
+// Export the single function that starts both jobs
 module.exports = startCronJobs;
