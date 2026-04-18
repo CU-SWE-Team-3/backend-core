@@ -15,6 +15,7 @@ const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const playerRoutes = require('./routes/playerRoutes');
+const playlistRoutes = require('./routes/playlistRoutes');
 
 const adminRoutes = require('./routes/adminRoutes');
 
@@ -113,6 +114,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/tracks', trackRoutes);
 
 app.use('/api/player', playerRoutes);
+app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/admin', adminRoutes);
 // ==========================================
