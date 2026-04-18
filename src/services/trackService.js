@@ -249,6 +249,7 @@ exports.confirmUpload = async (trackId, userId) => {
 };
 
 // 3. FETCH SINGLE TRACK (Public streaming)
+// 3. FETCH SINGLE TRACK (Public streaming)
 exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   const track = await Track.findOne({ permalink })
     .select('-audioUrl')
@@ -263,19 +264,28 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   }
 
   // ==========================================
-  // NEW SECURITY LOGIC: PROTECT PRIVATE TRACKS
+  // NEW SECURITY LOGIC: PROTECT MODERATED & PRIVATE TRACKS
   // ==========================================
 
-  // Assuming your database uses `isPublic: false` to mark private tracks
-  if (track.isPublic === false) {
-    // Check if the user is logged in AND their ID matches the artist's ID
-    // We use .toString() because Mongoose ObjectIds can fail basic === comparisons
-    const isOwner =
-      requestingUserId &&
-      track.artist._id.toString() === requestingUserId.toString();
+  // Is the person requesting this the actual artist?
+  const isOwner =
+    requestingUserId &&
+    track.artist._id.toString() === requestingUserId.toString();
 
+  // 1. ADMIN MODERATION CHECK (NEW)
+  if (track.moderationStatus === 'Hidden_By_Admin') {
     if (!isOwner) {
-      // Throw 403 Forbidden (or 404 so people don't even know it exists)
+      // If a regular user tries to listen, block them!
+      throw new AppError(
+        'This track has been removed by an Administrator.',
+        403
+      );
+    }
+  }
+
+  // 2. REGULAR PRIVATE TRACK CHECK (Your existing logic)
+  if (track.isPublic === false) {
+    if (!isOwner) {
       throw new AppError('This track is private and cannot be accessed.', 403);
     }
   }

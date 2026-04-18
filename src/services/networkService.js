@@ -99,6 +99,7 @@ exports.getUserFeed = async (userId) => {
   const feed = await Track.find({
     artist: { $in: followingIds },
     isPublic: true,
+    moderationStatus: 'Approved',
     processingState: 'Finished',
     releaseDate: { $lte: new Date() },
   })

@@ -9,13 +9,16 @@ const subscriptionController = require('./controllers/subscriptionController');
 // const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const networkRoutes = require('./routes/networkRoutes');
-
+const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
 const historyRouter = require('./routes/historyRoutes');
 
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const playerRoutes = require('./routes/playerRoutes');
+const playlistRoutes = require('./routes/playlistRoutes');
+
+const adminRoutes = require('./routes/adminRoutes');
 
 const globalErrorHandler = require('./middlewares/errorHandler');
 const AppError = require('./utils/appError');
@@ -112,7 +115,7 @@ app.use(mongoSanitize());
 // ==========================================
 app.use('/.well-known', express.static(path.join(__dirname, '.well-known')));
 app.use('/api/history', historyRouter);
-
+app.use('/api/messages', messageRoutes); // <--- NEW: Mount message routes
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
@@ -129,9 +132,11 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/tracks', trackRoutes);
 
 app.use('/api/player', playerRoutes);
+app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
 
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/admin', adminRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes
