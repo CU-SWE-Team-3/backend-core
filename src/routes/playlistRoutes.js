@@ -74,5 +74,7 @@ router.patch(
   upload.single('artwork'),
   playlistController.uploadArtwork
 );
+// Get all playlists (Public / Optional Auth for private visibility)
+router.get('/', optionalAuth, playlistController.getAllPlaylists);
 
 module.exports = router;

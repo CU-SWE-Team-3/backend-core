@@ -15,6 +15,35 @@ class PlaylistService {
     return await playlist.save();
   }
 
+  // Fetch multiple playlists (Supports filtering by creator and handles privacy)
+  static async getAllPlaylists(queryParams, currentUser) {
+    // eslint-disable-next-line prefer-object-spread
+    const filter = Object.assign({}, queryParams);
+
+    // PRIVACY LOGIC:
+    // If the frontend is searching for a specific user's playlists (e.g., viewing a profile)
+    if (filter.creator) {
+      // If no user is logged in, OR the logged-in user is NOT the creator they are searching for:
+      // Force the database to only return PUBLIC playlists.
+      if (
+        !currentUser ||
+        currentUser._id.toString() !== filter.creator.toString()
+      ) {
+        filter.isPrivate = false;
+      }
+    } else {
+      // If just browsing the platform generally, only show public playlists
+      filter.isPrivate = false;
+    }
+
+    // Query the database, sort by newest first, and optionally populate the creator's display name
+    const playlists = await Playlist.find(filter)
+      .populate('creator', 'name') // Adjust 'name' to your User model's display field if needed
+      .sort('-createdAt');
+
+    return playlists;
+  }
+
   // 2. Read / Fetch a playlist (Handles Secret Token & Dead Tracks)
   static async getPlaylist(playlistId, user, secretToken) {
     // 1. Fetch the playlist and POPULATE the tracks array

@@ -76,6 +76,17 @@ exports.getEmbedCode = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getAllPlaylists = catchAsync(async (req, res, next) => {
+  // Pass req.query for filtering and req.user for privacy checks
+  const playlists = await PlaylistService.getAllPlaylists(req.query, req.user);
+
+  res.status(200).json({
+    status: 'success',
+    results: playlists.length, // Good API practice to include the array length
+    data: { playlists },
+  });
+});
+
 // 👇 Added the Artwork Upload Controller
 exports.uploadArtwork = catchAsync(async (req, res, next) => {
   // Multer adds the 'file' object to 'req'. If it's not there, reject the request.
