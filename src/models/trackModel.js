@@ -93,6 +93,12 @@ const trackSchema = new mongoose.Schema(
       default: true, // true = Public (searchable), false = Private (link-only)
     },
 
+    moderationStatus: {
+      type: String,
+      enum: ['Approved', 'Hidden_By_Admin'],
+      default: 'Approved', // Controlled ONLY by Admins
+    },
+
     // ==========================================
     // BE-2: AUDIO PIPELINE (Placeholders)
     // ==========================================
