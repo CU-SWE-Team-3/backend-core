@@ -2,7 +2,7 @@
 const express = require('express');
 const messageController = require('../controllers/messageController');
 const { protect } = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const {
   sendMessageSchema,
   getMessagesSchema,

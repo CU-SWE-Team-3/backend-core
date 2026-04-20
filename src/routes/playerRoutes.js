@@ -4,7 +4,7 @@
 const express = require('express');
 const playerController = require('../controllers/playerController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const {
   getStreamSchema,
   updatePlayerStateSchema,
@@ -30,7 +30,7 @@ module.exports = router;
 // ─── NOTE ──────────────────────────────────────────────────────────────────────
 // historyRoutes.js should be updated to:
 //
-//   const { validate } = require('../validations/validationMiddleware');
+//   const { validate } = require('../middlewares/validationMiddleware');
 //   const { updateProgressSchema, recentlyPlayedSchema } = require('../validations/playerValidation');
 //
 //   router.post('/progress', validate(updateProgressSchema), historyController.updateProgress);

@@ -3,8 +3,11 @@ const subscriptionService = require('../services/subscriptionService');
 
 exports.subscribe = catchAsync(async (req, res, next) => {
   const { planType } = req.body;
-  
-  const result = await subscriptionService.createStripeCheckout(req.user, planType);
+
+  const result = await subscriptionService.createStripeCheckout(
+    req.user,
+    planType
+  );
 
   // Send the response exactly once
   res.status(200).json(result);
@@ -15,10 +18,9 @@ exports.cancel = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    data: result
+    data: result,
   });
 });
-
 
 exports.stripeWebhook = catchAsync(async (req, res, next) => {
   const signature = req.headers['stripe-signature'];

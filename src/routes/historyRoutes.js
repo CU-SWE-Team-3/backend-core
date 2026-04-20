@@ -1,7 +1,7 @@
 const express = require('express');
 const historyController = require('../controllers/historyController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const {
   updateProgressSchema,
   recentlyPlayedSchema,

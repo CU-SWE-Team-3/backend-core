@@ -170,6 +170,7 @@ exports.sendMessage = async (
     conversation.unreadCounts.get(receiverId.toString()) || 0;
   conversation.unreadCounts.set(receiverId.toString(), currentUnread + 1);
   conversation.lastMessage = newMessage._id;
+  conversation.markModified('unreadCounts');
   await conversation.save();
 
   // 5. Emit real-time WebSocket event IF the receiver is online
@@ -225,7 +226,7 @@ exports.markMessagesAsRead = async (conversationId, userId) => {
     }
   }
 
-  return true;
+  return result.modifiedCount;
 };
 
 exports.hideConversation = async (conversationId, userId) => {

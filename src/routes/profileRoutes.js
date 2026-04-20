@@ -3,7 +3,7 @@ const profileController = require('../controllers/profileController');
 const upload = require('../middlewares/uploadMiddleware');
 const { protect } = require('../middlewares/authMiddleware');
 const interactionController = require('../controllers/interactionController');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const {
   updateProfileSchema,
   updatePrivacySchema,

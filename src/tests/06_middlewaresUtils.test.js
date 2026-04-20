@@ -582,7 +582,7 @@ describe('uploadMiddleware', () => {
 // ─── validationMiddleware ─────────────────────────────────────────────────────
 
 describe('validationMiddleware — runFieldRules', () => {
-  const { runFieldRules } = require('../validations/validationMiddleware');
+  const { runFieldRules } = require('../middlewares/validationMiddleware');
 
   // required
   test('required: fails for undefined', () => {
@@ -798,7 +798,7 @@ describe('validationMiddleware — runFieldRules', () => {
 });
 
 describe('validationMiddleware — validate()', () => {
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const mkReq = (body = {}, params = {}, query = {}) => ({
     body,
     params,
@@ -863,7 +863,7 @@ describe('validationMiddleware — validate()', () => {
 
 describe('authValidation schemas', () => {
   const s = require('../validations/authValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
 
@@ -985,7 +985,7 @@ describe('authValidation schemas', () => {
 
 describe('profileValidation schemas', () => {
   const s = require('../validations/profileValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
 
@@ -1064,7 +1064,7 @@ describe('profileValidation schemas', () => {
 
 describe('trackValidation schemas', () => {
   const s = require('../validations/trackValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
   const VID = '507f1f77bcf86cd799439011';
@@ -1182,7 +1182,7 @@ describe('trackValidation schemas', () => {
 
 describe('networkValidation schemas', () => {
   const s = require('../validations/networkValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
   const VID = '507f1f77bcf86cd799439011';
@@ -1229,7 +1229,7 @@ describe('networkValidation schemas', () => {
 
 describe('interactionValidation schemas', () => {
   const s = require('../validations/interactionValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
   const VID = '507f1f77bcf86cd799439011';
@@ -1280,7 +1280,7 @@ describe('interactionValidation schemas', () => {
 
 describe('playerValidation schemas', () => {
   const s = require('../validations/playerValidation');
-  const { validate } = require('../validations/validationMiddleware');
+  const { validate } = require('../middlewares/validationMiddleware');
   const req = (body = {}, params = {}, query = {}) => ({ body, params, query });
   const n = () => jest.fn();
   const VID = '507f1f77bcf86cd799439011';
