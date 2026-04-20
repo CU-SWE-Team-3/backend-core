@@ -11,18 +11,30 @@ const listenHistorySchema = new mongoose.Schema(
     track: {
       type: mongoose.Schema.ObjectId,
       ref: 'Track',
-      required: [true, 'A listen history record must belong to a track'],
+      default: null,
+    },
+    // Which playlist this track was played from (null = standalone)
+    playlist: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Playlist',
+      default: null,
+    },
+    // Type of history record
+    type: {
+      type: String,
+      enum: ['track', 'playlist'],
+      required: true,
+      default: 'track',
     },
     progress: {
       type: Number,
       default: 0,
-      description: 'Playback progress in seconds',
+      description:
+        'Playback progress in seconds (only relevant for track type)',
     },
     isPlayCounted: {
       type: Boolean,
       default: false,
-      description:
-        'Prevents multiple play count increments for a single listen',
     },
     playedAt: {
       type: Date,
@@ -37,9 +49,14 @@ const listenHistorySchema = new mongoose.Schema(
   }
 );
 
-// Compound index to quickly find a specific user's history in chronological order
+// For track history: one record per user+track
+listenHistorySchema.index({ user: 1, track: 1, type: 1 }, { sparse: true });
+
+// For playlist history: one record per user+playlist
+listenHistorySchema.index({ user: 1, playlist: 1, type: 1 }, { sparse: true });
+
+// For sorting by most recent
 listenHistorySchema.index({ user: 1, playedAt: -1 });
 
 const ListenHistory = mongoose.model('ListenHistory', listenHistorySchema);
-
 module.exports = ListenHistory;

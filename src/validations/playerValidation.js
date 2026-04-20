@@ -102,6 +102,11 @@ const updateProgressSchema = {
       minMessage: 'progress cannot be negative',
       // No hard max — the service caps at track.duration
     },
+    playlistId: {
+      required: false,
+      type: 'mongoId',
+      typeMessage: 'playlistId must be a valid Playlist ID',
+    },
   },
 };
 

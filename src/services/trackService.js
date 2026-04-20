@@ -30,6 +30,25 @@ exports.updateTrackMetadata = async (trackId, user, metadataBody) => {
     'tags',
     'releaseDate',
     'isPublic',
+    'isrc',
+    'iswc',
+    'composer',
+    'publisher',
+    'releaseTitle',
+    'albumTitle',
+    'recordLabel',
+    'barcode',
+    'pLine',
+    'license',
+    'containsExplicitContent',
+    'buyLink',
+    'allowComments',
+    'displayStatsPublicly',
+    'enableDirectDownloads',
+    'enableContentId',
+    'includeInRssFeed',
+    'previewStartTime',
+    'previewEndTime',
   ];
 
   allowedFields.forEach((field) => {
@@ -140,6 +159,25 @@ exports.generateUploadUrl = async (user, trackData) => {
     tags,
     isPublic,
     releaseDate,
+    isrc,
+    iswc,
+    composer,
+    publisher,
+    releaseTitle,
+    albumTitle,
+    recordLabel,
+    barcode,
+    pLine,
+    license,
+    containsExplicitContent,
+    buyLink,
+    allowComments,
+    displayStatsPublicly,
+    enableDirectDownloads,
+    enableContentId,
+    includeInRssFeed,
+    previewStartTime,
+    previewEndTime,
   } = trackData;
   // Module 12: Premium Subscriptions (Upload Limit Check)
   // ONLY Pro users bypass the limit
@@ -213,11 +251,30 @@ exports.generateUploadUrl = async (user, trackData) => {
     duration: Math.round(duration),
     audioUrl: finalAudioUrl,
     processingState: 'Processing',
-    description: description,
-    genre: genre,
-    tags: tags,
+    description,
+    genre,
+    tags,
     isPublic: isPublic !== undefined ? isPublic : true,
     releaseDate: finalReleaseDate,
+    isrc,
+    iswc,
+    composer,
+    publisher,
+    releaseTitle,
+    albumTitle,
+    recordLabel,
+    barcode,
+    pLine,
+    license,
+    containsExplicitContent,
+    buyLink,
+    allowComments,
+    displayStatsPublicly,
+    enableDirectDownloads,
+    enableContentId,
+    includeInRssFeed,
+    previewStartTime: previewStartTime !== undefined ? previewStartTime : 0,
+    previewEndTime: previewEndTime !== undefined ? previewEndTime : 20,
   });
 
   return { trackId: newTrack._id, uploadUrl };
@@ -248,7 +305,6 @@ exports.confirmUpload = async (trackId, userId) => {
   return track;
 };
 
-// 3. FETCH SINGLE TRACK (Public streaming)
 // 3. FETCH SINGLE TRACK (Public streaming)
 exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   const track = await Track.findOne({ permalink })
@@ -290,6 +346,13 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
     }
   }
 
+  if (!track.displayStatsPublicly) {
+    track.playCount = undefined;
+    track.likeCount = undefined;
+    track.repostCount = undefined;
+    track.commentCount = undefined;
+  }
+
   return track;
 };
 
@@ -306,6 +369,13 @@ exports.downloadTrackAudio = async (trackId, user) => {
   const track = await Track.findById(trackId);
   if (!track || track.processingState !== 'Finished') {
     throw new AppError('Track not found or not ready.', 404);
+  }
+
+  if (!track.enableDirectDownloads) {
+    throw new AppError(
+      'The artist has not enabled direct downloads for this track.',
+      403
+    );
   }
 
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;

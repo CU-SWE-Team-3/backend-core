@@ -150,6 +150,97 @@ const trackSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    isrc: {
+      type: String,
+      trim: true,
+      maxlength: [20, 'ISRC cannot exceed 20 characters'],
+    },
+    iswc: {
+      type: String,
+      trim: true,
+      maxlength: [20, 'ISWC cannot exceed 20 characters'],
+    },
+    composer: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Composer cannot exceed 100 characters'],
+    },
+    publisher: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Publisher cannot exceed 100 characters'],
+    },
+    releaseTitle: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Release title cannot exceed 100 characters'],
+    },
+    albumTitle: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Album title cannot exceed 100 characters'],
+    },
+    recordLabel: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Record label cannot exceed 100 characters'],
+    },
+    barcode: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Barcode cannot exceed 50 characters'],
+    },
+    pLine: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'P line cannot exceed 100 characters'],
+    },
+    license: {
+      type: String,
+      enum: ['All Rights Reserved', 'Creative Commons'],
+      default: 'All Rights Reserved',
+    },
+    containsExplicitContent: {
+      type: Boolean,
+      default: false,
+    },
+    buyLink: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Buy link cannot exceed 500 characters'],
+    },
+    // Permissions tab
+    allowComments: {
+      type: Boolean,
+      default: true,
+    },
+    displayStatsPublicly: {
+      type: Boolean,
+      default: true,
+    },
+    enableDirectDownloads: {
+      type: Boolean,
+      default: false,
+    },
+    enableContentId: {
+      type: Boolean,
+      default: false,
+    },
+    includeInRssFeed: {
+      type: Boolean,
+      default: true,
+    },
+    // Advanced tab — audio clip preview
+    previewStartTime: {
+      type: Number,
+      default: 0,
+      min: [0, 'Preview start time cannot be negative'],
+    },
+    previewEndTime: {
+      type: Number,
+      default: 20,
+      min: [0, 'Preview end time cannot be negative'],
+    },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt

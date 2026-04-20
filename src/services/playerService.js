@@ -28,6 +28,8 @@ exports.getStreamingData = async (trackId, user) => {
     streamUrl: track.hlsUrl,
     duration: track.duration,
     format: track.format,
+    previewStartTime: track.previewStartTime,
+    previewEndTime: track.previewEndTime,
   };
 };
 

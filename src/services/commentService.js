@@ -12,6 +12,10 @@ exports.addComment = async (
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('Track not found', 404);
 
+  if (!track.allowComments) {
+    throw new AppError('Comments are disabled for this track', 403);
+  }
+
   // Ensure parent comment (if provided) is valid and belongs to the same track, and that replies are only one level deep
   if (parentCommentId) {
     const parent = await Comment.findById(parentCommentId);
