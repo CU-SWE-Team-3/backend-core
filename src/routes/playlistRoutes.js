@@ -2,7 +2,7 @@
 const express = require('express');
 const playlistController = require('../controllers/playlistController');
 const { protect, optionalAuth } = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 
 // 👇 Import your multer middleware
 // Adjust the file name if it's named 'upload.middleware.js' in your folder!

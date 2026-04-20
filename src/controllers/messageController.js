@@ -138,13 +138,22 @@ exports.deleteMessageForMe = catchAsync(async (req, res, next) => {
 });
 
 exports.markAsRead = catchAsync(async (req, res, next) => {
-  await messageService.markMessagesAsRead(
+  const modifiedCount = await messageService.markMessagesAsRead(
     req.params.conversationId,
     req.user._id
   );
 
+  if (modifiedCount === 0) {
+    return res.status(200).json({
+      success: true,
+      message: 'All messages were already read.',
+      updatedCount: 0,
+    });
+  }
+
   res.status(200).json({
     success: true,
-    message: 'Messages marked as read.',
+    message: `Successfully marked ${modifiedCount} messages as read.`,
+    updatedCount: modifiedCount,
   });
 });

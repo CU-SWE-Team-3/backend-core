@@ -1,7 +1,7 @@
 const express = require('express');
 const networkController = require('../controllers/networkController');
 const { protect } = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const {
   followSchema,
   blockSchema,

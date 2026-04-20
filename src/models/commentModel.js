@@ -5,34 +5,37 @@ const commentSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'A comment must belong to a user']
+      required: [true, 'A comment must belong to a user'],
     },
     track: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Track',
-      required: [true, 'A comment must belong to a track']
+      required: [true, 'A comment must belong to a track'],
     },
     content: {
       type: String,
       required: [true, 'Comment content cannot be empty'],
       trim: true,
-      maxlength: [1000, 'Comment cannot exceed 1000 characters']
+      maxlength: [1000, 'Comment cannot exceed 1000 characters'],
     },
     timestamp: {
       type: Number,
-      required: [true, 'A track timestamp (in seconds) is required for the comment'],
-      min: [0, 'Timestamp cannot be negative']
+      required: [
+        true,
+        'A track timestamp (in seconds) is required for the comment',
+      ],
+      min: [0, 'Timestamp cannot be negative'],
     },
     parentComment: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Comment',
-      default: null
-    }
+      default: null,
+    },
   },
-  { 
+  {
     timestamps: true,
     toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    toObject: { virtuals: true },
   }
 );
 
@@ -43,7 +46,7 @@ commentSchema.index({ track: 1, timestamp: 1 });
 commentSchema.virtual('replies', {
   ref: 'Comment',
   localField: '_id',
-  foreignField: 'parentComment'
+  foreignField: 'parentComment',
 });
 
 const Comment = mongoose.model('Comment', commentSchema);

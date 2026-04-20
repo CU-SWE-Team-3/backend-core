@@ -1,8 +1,6 @@
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/userModel');
 const AppError = require('../utils/appError');
-const crypto = require('crypto');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 
 exports.createStripeCheckout = async (user, planType) => {
   // 1. Guard check
@@ -27,24 +25,24 @@ exports.createStripeCheckout = async (user, planType) => {
         quantity: 1,
       },
     ],
-    // client_reference_id is CRITICAL: It passes your database User ID to Stripe, 
+    // client_reference_id is CRITICAL: It passes your database User ID to Stripe,
     // so Stripe can send it back to you in the webhook!
-    client_reference_id: user._id.toString(), 
+    client_reference_id: user._id.toString(),
     success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.FRONTEND_URL}/payment-cancelled`,
-    metadata: { planType } // Pass the plan type so the webhook knows what they bought
+    metadata: { planType }, // Pass the plan type so the webhook knows what they bought
   });
 
   // 4. Return the Stripe URL to the frontend
-  return { 
-    success: true, 
-    checkoutUrl: session.url 
+  return {
+    success: true,
+    checkoutUrl: session.url,
   };
-};;
+};
 
 exports.cancelSubscription = async (userId) => {
   const user = await User.findById(userId);
-  
+
   if (!user.isPremium) {
     throw new AppError('You do not have an active subscription.', 400);
   }
@@ -54,8 +52,9 @@ exports.cancelSubscription = async (userId) => {
   await user.save();
 
   return {
-    message: 'Subscription cancelled. You will retain premium access until your billing cycle ends.',
-    expiresAt: user.subscriptionExpiresAt
+    message:
+      'Subscription cancelled. You will retain premium access until your billing cycle ends.',
+    expiresAt: user.subscriptionExpiresAt,
   };
 };
 
@@ -80,7 +79,7 @@ exports.handleWebhook = async (rawBody, signature) => {
 
     // 3. Extract the data we sent earlier in createStripeCheckout
     const userId = session.client_reference_id;
-    const planType = session.metadata.planType;
+    const { planType } = session.metadata;
     const stripeCustomerId = session.customer;
     const stripeSubscriptionId = session.subscription;
 
@@ -95,9 +94,11 @@ exports.handleWebhook = async (rawBody, signature) => {
       stripeCustomerId: stripeCustomerId,
       stripeSubscriptionId: stripeSubscriptionId,
       subscriptionExpiresAt: expiryDate,
-      cancelAtPeriodEnd: false
+      cancelAtPeriodEnd: false,
     });
 
-    console.log(`✅ [Stripe] Successfully upgraded User ${userId} to ${planType}`);
+    console.log(
+      `✅ [Stripe] Successfully upgraded User ${userId} to ${planType}`
+    );
   }
 };

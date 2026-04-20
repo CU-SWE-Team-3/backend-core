@@ -143,7 +143,7 @@ exports.generateUploadUrl = async (user, trackData) => {
   } = trackData;
   // Module 12: Premium Subscriptions (Upload Limit Check)
   // ONLY Pro users bypass the limit
-  if (user.subscriptionPlan !== 'Pro') { 
+  if (user.subscriptionPlan !== 'Pro') {
     const trackCount = await Track.countDocuments({ artist: user._id });
     if (trackCount >= 3) {
       throw new AppError(
@@ -161,7 +161,6 @@ exports.generateUploadUrl = async (user, trackData) => {
   } else {
     finalReleaseDate = Date.now();
   }
-
 
   const ALLOWED_FORMATS = [
     'audio/mpeg',
@@ -196,6 +195,7 @@ exports.generateUploadUrl = async (user, trackData) => {
     permissions: BlobSASPermissions.parse('cw'), // create & write
     startsOn: new Date(),
     expiresOn: new Date(new Date().valueOf() + 15 * 60 * 1000), // 15 mins
+    contentLengthRange: { min: 0, max: 500 * 1024 * 1024 }, //limit the track upload to 500 mb
   };
 
   const sasToken = generateBlobSASQueryParameters(
@@ -293,11 +293,10 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   return track;
 };
 
-
 // 4. DOWNLOAD TRACK (Module 12: Premium Offline Listening)
 exports.downloadTrackAudio = async (trackId, user) => {
   // ONLY Go+ users get offline listening
-  if (user.subscriptionPlan !== 'Go+') { 
+  if (user.subscriptionPlan !== 'Go+') {
     throw new AppError(
       'Requires a Go+ Subscription for offline listening.',
       403

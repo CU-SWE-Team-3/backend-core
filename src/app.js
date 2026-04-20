@@ -5,9 +5,9 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const path = require('path');
-const subscriptionController = require('./controllers/subscriptionController');
 // const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
+const subscriptionController = require('./controllers/subscriptionController');
 const networkRoutes = require('./routes/networkRoutes');
 const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
 const historyRouter = require('./routes/historyRoutes');
@@ -75,7 +75,6 @@ app.post(
   subscriptionController.stripeWebhook // <--- Make sure this points to your actual webhook function!
 );
 
-
 // Body parser, reading data from body into req.body (Prevents large payload attacks)
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser()); // <--- NEW: Allows Express to read incoming cookies
@@ -104,11 +103,6 @@ app.use(mongoSanitize());
 //     ],
 //   })
 // );
-
-
-
-
-
 
 // ==========================================
 // 2. ROUTES

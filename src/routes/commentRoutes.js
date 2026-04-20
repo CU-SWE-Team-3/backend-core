@@ -1,7 +1,7 @@
 const express = require('express');
 const commentController = require('../controllers/commentController');
 const { protect } = require('../middlewares/authMiddleware');
-const { validate } = require('../validations/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const { deleteCommentSchema } = require('../validations/interactionValidation');
 
 const router = express.Router();

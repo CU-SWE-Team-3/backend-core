@@ -73,68 +73,6 @@ const initializeSockets = (server) => {
     // ==========================================
     // FULL IMPLEMENTATION: MARK AS READ
     // ==========================================
-    socket.on('mark_as_read', async ({ conversationId }) => {
-      try {
-        const userId = socket.user.id;
-
-        // 1. Verify the conversation exists and the user is a participant
-        const conversation = await Conversation.findOne({
-          _id: conversationId,
-          participants: userId,
-        });
-
-        if (!conversation) {
-          return socket.emit('error', { message: 'Conversation not found' });
-        }
-
-        // 2. Reset the unread count to 0 for the user reading the messages
-        if (conversation.unreadCounts.get(userId.toString()) > 0) {
-          conversation.unreadCounts.set(userId.toString(), 0);
-          await conversation.save();
-        }
-        conversation.markModified('unreadCounts');
-
-        await conversation.save();
-        // 3. Bulk update all unread messages sent by the OTHER person to 'read'
-        // We use $ne (not equal) so we don't mark the user's OWN messages as read by themselves
-        const updateResult = await Message.updateMany(
-          {
-            conversationId: conversationId,
-            senderId: { $ne: userId },
-            status: { $ne: 'read' },
-          },
-          {
-            $set: { status: 'read' },
-          }
-        );
-
-        // 4. If messages were actually updated, emit an event to the sender
-        // so their UI shows the "Read" checkmarks instantly
-        if (updateResult.modifiedCount > 0) {
-          // Find the other participant's ID
-          const otherParticipantId = conversation.participants.find(
-            (p) => p.toString() !== userId.toString()
-          );
-
-          if (otherParticipantId) {
-            const otherSocketId = connectedUsers.get(
-              otherParticipantId.toString()
-            );
-
-            // If the other person is currently online, notify them
-            if (otherSocketId) {
-              io.to(otherSocketId).emit('messages_read', {
-                conversationId: conversationId,
-                readAt: new Date(),
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Socket error in mark_as_read:', error);
-        socket.emit('error', { message: 'Failed to mark messages as read' });
-      }
-    });
 
     socket.on('mark_as_delivered', async ({ conversationId }) => {
       try {

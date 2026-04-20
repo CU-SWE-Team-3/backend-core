@@ -5,7 +5,7 @@
  * No external packages needed — plugs directly into Express and AppError.
  *
  * Usage in a route file:
- *   const { validate } = require('../validations/validationMiddleware');
+ *   const { validate } = require('../middlewares/validationMiddleware');
  *   const { registerSchema } = require('../validations/authValidation');
  *
  *   router.post('/register', validate(registerSchema), authController.register);
