@@ -1,76 +1,95 @@
 const ListenHistory = require('../models/listenHistoryModel');
 const AppError = require('../utils/appError');
-
 const Track = require('../models/trackModel');
 
 /**
- * Updates or creates a listen history record for a user and track.
- * This tracks playback progress and updates the "Recently Played" timestamp.
+ * Records playback progress for a track.
+ * Optionally accepts a playlistId if the track is being played from a playlist.
  */
-exports.recordPlaybackProgress = async (userId, trackId, progress) => {
+exports.recordPlaybackProgress = async (
+  userId,
+  trackId,
+  progress,
+  playlistId = null
+) => {
   const track = await Track.findById(trackId);
   if (!track) return null;
 
   const historyRecord = await ListenHistory.findOneAndUpdate(
-    { user: userId, track: trackId },
-    { progress: progress, playedAt: Date.now() },
+    { user: userId, track: trackId, type: 'track' },
+    { progress, playedAt: Date.now(), playlist: playlistId || null },
     { new: true, upsert: true }
   ).select('-__v');
 
-  // 1. Define our thresholds
-  const isStartingOver = progress < track.duration * 0.1; // Under 10%
-  const isCompletedPlay = progress >= track.duration * 0.9; // Over 90%
+  const isStartingOver = progress < track.duration * 0.1;
+  const isCompletedPlay = progress >= track.duration * 0.9;
 
-  // 2. We only count the play if they hit 90% AND it isn't currently locked
   const shouldCountPlay =
     isCompletedPlay && (!historyRecord || historyRecord.isPlayCounted !== true);
 
-  // 3. Setup our database update
   const updateData = {
     $set: {
-      progress: progress,
+      progress,
       playedAt: Date.now(),
+      playlist: playlistId || null,
     },
   };
 
-  // 4. THE MAGIC: Unlock or Lock the play based on where they are in the song
   if (isStartingOver) {
-    updateData.$set.isPlayCounted = false; // User restarted the song, unlock it!
+    updateData.$set.isPlayCounted = false;
   } else if (isCompletedPlay) {
-    updateData.$set.isPlayCounted = true; // User finished it, lock it to prevent spam!
+    updateData.$set.isPlayCounted = true;
   }
 
-  // 5. Update the history record
   const updatedHistory = await ListenHistory.findOneAndUpdate(
-    { user: userId, track: trackId },
+    { user: userId, track: trackId, type: 'track' },
     updateData,
     { new: true, upsert: true }
   );
 
-  // 6. Increment play count if valid
   if (shouldCountPlay) {
     await Track.findByIdAndUpdate(trackId, { $inc: { playCount: 1 } });
   }
 
+  // If played from a playlist, also upsert a playlist-type history record
+  if (playlistId) {
+    await ListenHistory.findOneAndUpdate(
+      { user: userId, playlist: playlistId, type: 'playlist' },
+      { playedAt: Date.now() },
+      { upsert: true }
+    );
+  }
+
   return updatedHistory;
 };
+
 /**
- * Retrieves the "Recently Played" feed for a specific user.
+ * Recently played TRACKS only (the History tab — track list).
+ * Includes which playlist each track was played from.
  */
 exports.getRecentlyPlayed = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
 
-  const history = await ListenHistory.find({ user: userId })
+  const history = await ListenHistory.find({ user: userId, type: 'track' })
     .select('-__v')
     .sort({ playedAt: -1 })
     .skip(skip)
     .limit(limit)
     .populate({
       path: 'track',
-      select: 'title permalink artworkUrl artist duration playCount isPublic',
+      select:
+        'title permalink artworkUrl artist duration playCount likeCount isPublic',
       populate: {
         path: 'artist',
         select: 'displayName permalink avatarUrl isPremium',
+      },
+    })
+    .populate({
+      path: 'playlist',
+      select: 'title permalink artworkUrl creator',
+      populate: {
+        path: 'creator',
+        select: 'displayName permalink',
       },
     });
 
@@ -78,22 +97,76 @@ exports.getRecentlyPlayed = async (userId, page = 1, limit = 20) => {
 };
 
 /**
- * Evaluates playback and download accessibility based on user tier and track state.
+ * Recently played PLAYLISTS only.
+ */
+exports.getRecentlyPlayedPlaylists = async (userId, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+
+  const history = await ListenHistory.find({ user: userId, type: 'playlist' })
+    .sort({ playedAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate({
+      path: 'playlist',
+      select: 'title permalink artworkUrl trackCount creator releaseType',
+      populate: {
+        path: 'creator',
+        select: 'displayName permalink avatarUrl',
+      },
+    });
+
+  return history.filter((h) => h.playlist !== null);
+};
+
+/**
+ * Mixed recently played — both tracks and playlists merged and sorted by playedAt.
+ * This is what the home page "Recently Played" widget shows.
+ */
+exports.getRecentlyPlayedMixed = async (userId, limit = 10) => {
+  const history = await ListenHistory.find({ user: userId })
+    .sort({ playedAt: -1 })
+    .limit(limit * 2)
+    .populate({
+      path: 'track',
+      select: 'title permalink artworkUrl artist duration',
+      populate: { path: 'artist', select: 'displayName permalink avatarUrl' },
+    })
+    .populate({
+      path: 'playlist',
+      select: 'title permalink artworkUrl trackCount creator releaseType',
+      populate: { path: 'creator', select: 'displayName permalink avatarUrl' },
+    });
+
+  // Map each record to a unified shape and filter out nulls
+  const merged = history
+    .map((h) => {
+      if (h.type === 'track' && h.track) {
+        return { type: 'track', playedAt: h.playedAt, item: h.track };
+      }
+      if (h.type === 'playlist' && h.playlist) {
+        return { type: 'playlist', playedAt: h.playedAt, item: h.playlist };
+      }
+      return null;
+    })
+    .filter(Boolean)
+    .slice(0, limit);
+
+  return merged;
+};
+
+/**
+ * Accessibility check for streaming and downloading.
  */
 exports.checkAccessibility = (user, track, action = 'stream') => {
-  // 1. Check if the track is private and the user is not the owner
   if (!track.isPublic && track.artist.toString() !== user._id.toString()) {
     throw new AppError('This track is private and cannot be accessed.', 403);
   }
 
-  // 2. Handle standard streaming (Free users have standard streaming access)
   if (action === 'stream') {
     return true;
   }
 
-  // 3. Handle Offline Listening / Downloading (Go+ Plan Only)
   if (action === 'download') {
-    // STRICT SEPARATION: Only 'Go+' users get offline listening
     if (user.subscriptionPlan !== 'Go+') {
       throw new AppError(
         'Requires a Go+ Subscription for offline listening.',
@@ -104,4 +177,12 @@ exports.checkAccessibility = (user, track, action = 'stream') => {
   }
 
   throw new AppError('Invalid action requested.', 400);
+};
+
+/**
+ * Clear all listening history for a user (both tracks and playlists).
+ */
+exports.clearListeningHistory = async (userId) => {
+  await ListenHistory.deleteMany({ user: userId });
+  return true;
 };

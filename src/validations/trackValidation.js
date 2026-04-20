@@ -138,6 +138,120 @@ const initiateUploadSchema = {
         return null;
       },
     },
+    isrc: {
+      required: false,
+      type: 'string',
+      maxLength: 20,
+      maxLengthMessage: 'ISRC cannot exceed 20 characters',
+    },
+    iswc: {
+      required: false,
+      type: 'string',
+      maxLength: 20,
+      maxLengthMessage: 'ISWC cannot exceed 20 characters',
+    },
+    composer: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Composer cannot exceed 100 characters',
+    },
+    publisher: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Publisher cannot exceed 100 characters',
+    },
+    releaseTitle: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Release title cannot exceed 100 characters',
+    },
+    albumTitle: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Album title cannot exceed 100 characters',
+    },
+    recordLabel: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Record label cannot exceed 100 characters',
+    },
+    barcode: {
+      required: false,
+      type: 'string',
+      maxLength: 50,
+      maxLengthMessage: 'Barcode cannot exceed 50 characters',
+    },
+    pLine: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'P line cannot exceed 100 characters',
+    },
+    license: {
+      required: false,
+      type: 'string',
+      enum: ['All Rights Reserved', 'Creative Commons'],
+      enumMessage: 'License must be All Rights Reserved or Creative Commons',
+    },
+    containsExplicitContent: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'containsExplicitContent must be true or false',
+    },
+    buyLink: {
+      required: false,
+      type: 'string',
+      maxLength: 500,
+      maxLengthMessage: 'Buy link cannot exceed 500 characters',
+    },
+    allowComments: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'allowComments must be true or false',
+    },
+    displayStatsPublicly: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'displayStatsPublicly must be true or false',
+    },
+    enableDirectDownloads: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'enableDirectDownloads must be true or false',
+    },
+    enableContentId: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'enableContentId must be true or false',
+    },
+    includeInRssFeed: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'includeInRssFeed must be true or false',
+    },
+    previewStartTime: {
+      required: false,
+      type: 'number',
+      min: 0,
+      minMessage: 'Preview start time cannot be negative',
+    },
+    previewEndTime: {
+      required: false,
+      type: 'number',
+      min: 0,
+      minMessage: 'Preview end time cannot be negative',
+      custom: (v) => {
+        if (v === undefined || v === null) return null;
+        if (v - 0 > 20)
+          return 'Preview clip cannot exceed 20 seconds. Set previewStartTime accordingly.';
+        return null;
+      },
+    },
   },
 };
 
@@ -210,6 +324,120 @@ const updateMetadataSchema = {
         const d = new Date(v);
         if (Number.isNaN(d.getTime()))
           return 'releaseDate must be a valid date';
+        return null;
+      },
+    },
+    isrc: {
+      required: false,
+      type: 'string',
+      maxLength: 20,
+      maxLengthMessage: 'ISRC cannot exceed 20 characters',
+    },
+    iswc: {
+      required: false,
+      type: 'string',
+      maxLength: 20,
+      maxLengthMessage: 'ISWC cannot exceed 20 characters',
+    },
+    composer: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Composer cannot exceed 100 characters',
+    },
+    publisher: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Publisher cannot exceed 100 characters',
+    },
+    releaseTitle: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Release title cannot exceed 100 characters',
+    },
+    albumTitle: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Album title cannot exceed 100 characters',
+    },
+    recordLabel: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'Record label cannot exceed 100 characters',
+    },
+    barcode: {
+      required: false,
+      type: 'string',
+      maxLength: 50,
+      maxLengthMessage: 'Barcode cannot exceed 50 characters',
+    },
+    pLine: {
+      required: false,
+      type: 'string',
+      maxLength: 100,
+      maxLengthMessage: 'P line cannot exceed 100 characters',
+    },
+    license: {
+      required: false,
+      type: 'string',
+      enum: ['All Rights Reserved', 'Creative Commons'],
+      enumMessage: 'License must be All Rights Reserved or Creative Commons',
+    },
+    containsExplicitContent: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'containsExplicitContent must be true or false',
+    },
+    buyLink: {
+      required: false,
+      type: 'string',
+      maxLength: 500,
+      maxLengthMessage: 'Buy link cannot exceed 500 characters',
+    },
+    allowComments: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'allowComments must be true or false',
+    },
+    displayStatsPublicly: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'displayStatsPublicly must be true or false',
+    },
+    enableDirectDownloads: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'enableDirectDownloads must be true or false',
+    },
+    enableContentId: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'enableContentId must be true or false',
+    },
+    includeInRssFeed: {
+      required: false,
+      type: 'boolean',
+      typeMessage: 'includeInRssFeed must be true or false',
+    },
+    previewStartTime: {
+      required: false,
+      type: 'number',
+      min: 0,
+      minMessage: 'Preview start time cannot be negative',
+    },
+    previewEndTime: {
+      required: false,
+      type: 'number',
+      min: 0,
+      minMessage: 'Preview end time cannot be negative',
+      custom: (v) => {
+        if (v === undefined || v === null) return null;
+        if (v - 0 > 20)
+          return 'Preview clip cannot exceed 20 seconds. Set previewStartTime accordingly.';
         return null;
       },
     },

@@ -16,10 +16,21 @@ router.post(
   validate(updateProgressSchema),
   historyController.updateProgress
 );
+
 router.get(
   '/recently-played',
   validate(recentlyPlayedSchema),
   historyController.getRecentlyPlayed
 );
+
+router.get(
+  '/recently-played-playlists',
+  validate(recentlyPlayedSchema),
+  historyController.getRecentlyPlayedPlaylists
+);
+
+router.get('/recently-played-mixed', historyController.getRecentlyPlayedMixed);
+
+router.delete('/', historyController.clearHistory);
 
 module.exports = router;
