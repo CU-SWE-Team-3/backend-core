@@ -230,7 +230,7 @@ describe('queueProducer — publishToQueue & events', () => {
 
   test('publishes message successfully', async () => {
     const { publishToQueue } = require('../utils/queueProducer');
-    await publishToQueue('audio_processing_queue_v3', {
+    await publishToQueue('audio_processing_queue_v4', {
       trackId: 'tid',
       audioUrl: 'url',
     });

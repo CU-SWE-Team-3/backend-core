@@ -48,7 +48,9 @@ exports.recordPlaybackProgress = async (
   );
 
   if (shouldCountPlay) {
-    await Track.findByIdAndUpdate(trackId, { $inc: { playCount: 1 } });
+    await Track.findByIdAndUpdate(trackId, {
+      $inc: { playCount: 1, viralScore: 1 },
+    });
   }
 
   // If played from a playlist, also upsert a playlist-type history record

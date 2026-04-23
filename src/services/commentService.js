@@ -34,7 +34,9 @@ exports.addComment = async (
     parentComment: parentCommentId || null,
   });
 
-  await Track.findByIdAndUpdate(trackId, { $inc: { commentCount: 1 } });
+  await Track.findByIdAndUpdate(trackId, {
+    $inc: { commentCount: 1, viralScore: 2 },
+  });
   return newComment;
 };
 
@@ -91,7 +93,23 @@ exports.deleteComment = async (userId, commentId) => {
   }
 
   await Comment.deleteOne({ _id: comment._id });
-  await Track.findByIdAndUpdate(comment.track, {
-    $inc: { commentCount: -deletedCount },
-  });
+
+  const totalScoreLoss = deletedCount * 2;
+
+  // SAFE FLOOR UPDATE
+  await Track.findByIdAndUpdate(comment.track, [
+    {
+      $set: {
+        // Floor the commentCount at 0
+        commentCount: {
+          $max: [0, { $subtract: ['$commentCount', deletedCount] }],
+        },
+
+        // Floor the viralScore at 0
+        viralScore: {
+          $max: [0, { $subtract: ['$viralScore', totalScoreLoss] }],
+        },
+      },
+    },
+  ]);
 };

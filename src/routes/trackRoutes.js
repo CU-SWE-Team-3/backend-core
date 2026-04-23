@@ -4,6 +4,7 @@ const interactionController = require('../controllers/interactionController');
 const { protect, optionalAuth } = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const commentController = require('../controllers/commentController');
+const trendingController = require('../controllers/trendingController');
 const { validate } = require('../middlewares/validationMiddleware');
 const {
   initiateUploadSchema,
@@ -21,6 +22,10 @@ const {
 } = require('../validations/interactionValidation');
 
 const router = express.Router();
+
+// ── trending ──────────────────────────────────────────────────────
+
+router.get('/trending', trendingController.getTrendingCharts);
 
 // ── Metadata & Visibility ──────────────────────────────────────────────────────
 router.patch(
