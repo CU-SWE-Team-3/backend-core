@@ -5,6 +5,7 @@ const Block = require('../models/blockModel');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
 const { getIo, connectedUsers } = require('../sockets/socketSetup');
+const notificationService = require('./notificationService');
 
 const TIME_LIMIT_MS = 15 * 60 * 1000; // 15 Minutes
 
@@ -172,7 +173,6 @@ exports.sendMessage = async (
   conversation.lastMessage = newMessage._id;
   conversation.markModified('unreadCounts');
   await conversation.save();
-
   // 5. Emit real-time WebSocket event IF the receiver is online
   const io = getIo();
 
@@ -182,11 +182,25 @@ exports.sendMessage = async (
 
     newMessage.status = 'delivered';
     await newMessage.save();
-  } else {
-    // PREPARATION FOR MODULE 10:
-    // If the user is offline, this is where you will eventually trigger
-    // an entry in the Notifications DB and send a Push Notification!
   }
+
+  // ==========================================
+  // MODULE 10: NOTIFICATION TRIGGER
+  // ==========================================
+  // We determine what text to show in the notification dropdown.
+  // If they sent text, show it. If they sent a track/playlist, say so!
+  let notificationText = content;
+  if (!notificationText && attachment) {
+    notificationText = `Shared a ${attachment.type} with you`;
+  }
+
+  // Fire the notification! (We don't await this so it doesn't slow down the chat)
+  notificationService.notifyMessage(
+    receiverId,
+    senderId,
+    newMessage._id,
+    notificationText
+  );
 
   return newMessage;
 };

@@ -1,6 +1,10 @@
 const Interaction = require('../models/interactionModel');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
+const notificationService = require('./notificationService');
+const Playlist = require('../models/playlistModel');
+
+const Block = require('../models/blockModel');
 
 /**
  * Adds a repost for a user on a specific track
@@ -10,6 +14,22 @@ exports.addRepost = async (userId, trackId) => {
   if (!track) {
     throw new AppError('Track not found', 404);
   }
+  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
+  // Check if either user has blocked the other
+  const blockRecord = await Block.findOne({
+    $or: [
+      { blocker: track.artist, blocked: userId }, // The Artist blocked the Commenter/Liker
+      { blocker: userId, blocked: track.artist }, // The Commenter/Liker blocked the Artist
+    ],
+  });
+
+  if (blockRecord) {
+    throw new AppError(
+      'You are blocked from interacting with this user (or you have blocked them).',
+      403
+    );
+  }
+  // -------------------------------------------------------
 
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
@@ -29,7 +49,8 @@ exports.addRepost = async (userId, trackId) => {
   });
   await Track.findByIdAndUpdate(trackId, { $inc: { repostCount: 1 } });
 
-  // TODO: Trigger notification to track.artist here later in Module 10
+  // REPLACE YOUR TODO WITH THIS:
+  notificationService.notifyRepost(track.artist, userId, trackId);
 
   return { reposted: true };
 };
@@ -56,7 +77,12 @@ exports.removeRepost = async (userId, trackId) => {
   // Delete interaction and decrement counter
   await Interaction.findByIdAndDelete(existingInteraction._id);
   await Track.findByIdAndUpdate(trackId, { $inc: { repostCount: -1 } });
-
+  notificationService.retractNotification(
+    track.artist,
+    userId,
+    'REPOST',
+    trackId
+  );
   return { reposted: false };
 };
 
@@ -203,7 +229,18 @@ exports.addLike = async (userId, trackId) => {
   if (!track) {
     throw new AppError('Track not found', 404);
   }
+  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
+  const blockRecord = await Block.findOne({
+    $or: [
+      { blocker: track.artist, blocked: userId },
+      { blocker: userId, blocked: track.artist },
+    ],
+  });
 
+  if (blockRecord) {
+    throw new AppError('You are blocked from interacting with this user.', 403);
+  }
+  // -------------------------------------------------------
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
     targetId: trackId,
@@ -221,7 +258,7 @@ exports.addLike = async (userId, trackId) => {
     actionType: 'LIKE',
   });
   await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: 1 } });
-
+  notificationService.notifyLike(track.artist, userId, trackId);
   return { liked: true };
 };
 
@@ -247,6 +284,71 @@ exports.removeLike = async (userId, trackId) => {
   // Delete interaction and decrement counter
   await Interaction.findByIdAndDelete(existingInteraction._id);
   await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: -1 } });
+
+  notificationService.retractNotification(
+    track.artist,
+    userId,
+    'LIKE',
+    trackId
+  );
+  return { liked: false };
+};
+exports.addPlaylistLike = async (userId, playlistId) => {
+  const playlist = await Playlist.findById(playlistId);
+  if (!playlist) throw new AppError('Playlist not found', 404);
+  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
+  // Check if either user has blocked the other
+  const blockRecord = await Block.findOne({
+    $or: [
+      { blocker: playlist.creator, blocked: userId },
+      { blocker: userId, blocked: playlist.creator },
+    ],
+  });
+
+  if (blockRecord) {
+    throw new AppError('You are blocked from interacting with this user.', 403);
+  }
+  // -------------------------------------------------------
+
+  // Your existing interaction creation logic...
+  await Interaction.create({
+    actorId: userId,
+    targetId: playlistId,
+    actionType: 'LIKE',
+  });
+  await Playlist.findByIdAndUpdate(playlistId, { $inc: { likeCount: 1 } });
+
+  // MODULE 10 TRIGGER
+
+  if (playlist.creator.toString() !== userId.toString()) {
+    notificationService.notifyLike(playlist.creator, userId, playlistId);
+  }
+
+  return { liked: true };
+};
+
+/**
+ * Removes a like for a playlist
+ */
+exports.removePlaylistLike = async (userId, playlistId) => {
+  const playlist = await Playlist.findById(playlistId);
+  if (!playlist) throw new AppError('Playlist not found', 404);
+
+  await Interaction.findOneAndDelete({
+    actorId: userId,
+    targetId: playlistId,
+    actionType: 'LIKE',
+  });
+  await Playlist.findByIdAndUpdate(playlistId, { $inc: { likeCount: -1 } });
+
+  // MODULE 10 UNDO TRIGGER
+
+  notificationService.retractNotification(
+    playlist.creator,
+    userId,
+    'LIKE',
+    playlistId
+  );
 
   return { liked: false };
 };

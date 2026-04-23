@@ -11,7 +11,7 @@ const subscriptionController = require('./controllers/subscriptionController');
 const networkRoutes = require('./routes/networkRoutes');
 const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
 const historyRouter = require('./routes/historyRoutes');
-
+const notificationRoutes = require('./routes/notificationRoutes');
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
@@ -110,6 +110,7 @@ app.use(mongoSanitize());
 app.use('/.well-known', express.static(path.join(__dirname, '.well-known')));
 app.use('/api/history', historyRouter);
 app.use('/api/messages', messageRoutes); // <--- NEW: Mount message routes
+app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,

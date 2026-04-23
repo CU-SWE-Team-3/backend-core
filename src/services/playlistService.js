@@ -4,6 +4,8 @@ const Playlist = require('../models/playlistModel');
 // Adjust the path or capitalization if your file is named differently!
 const AppError = require('../utils/appError');
 const Track = require('../models/trackModel');
+const notificationService = require('./notificationService');
+const Follow = require('../models/followModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 
 class PlaylistService {
@@ -12,7 +14,35 @@ class PlaylistService {
     const playlist = new Playlist(playlistData);
     playlist.creator = userId;
 
-    return await playlist.save();
+    await playlist.save();
+
+    // ==========================================
+    // MODULE 10: NEW PLAYLIST NOTIFICATION
+    // Notify all followers if the playlist is public
+    // ==========================================
+    if (!playlist.isPrivate) {
+      Follow.find({ following: userId })
+        .then((followers) => {
+          followers.forEach((followDoc) => {
+            // NOTE: You may need to add a notifyNewPlaylist function to notificationService.js
+            // that mimics your notifyNewTrack function!
+            notificationService.notifyNewPlaylist(
+              followDoc.follower, // Recipient
+              userId, // Actor
+              playlist._id // Target (The Playlist)
+            );
+          });
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error(
+            '[Notification Error] Failed to fetch followers for playlist alert:',
+            err
+          );
+        });
+    }
+
+    return playlist;
   }
 
   // Fetch multiple playlists (Supports filtering by creator and handles privacy)
