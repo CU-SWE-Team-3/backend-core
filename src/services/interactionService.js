@@ -347,12 +347,6 @@ exports.addLike = async (userId, targetId, targetModel = 'Track') => {
   const ownerId = entity.artist || entity.creator;
   notificationService.notifyLike(ownerId, userId, targetId, targetModel);
 
-  return {
-    liked: true,
-    newLikeCount: updatedEntity.likeCount,
-  };
-};
-
   // Publish Polymorphic Data to RabbitMQ
   await publishToQueue('feed_fanout_queue_v3', {
     actorId: userId,
