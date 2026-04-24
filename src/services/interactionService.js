@@ -115,7 +115,6 @@ exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
 
   return { reposted: false };
 };
-
 /**
  * Fetches users who engaged with a track (Likes or Reposts)
  */
@@ -354,6 +353,19 @@ exports.addLike = async (userId, targetId, targetModel = 'Track') => {
   };
 };
 
+  // Publish Polymorphic Data to RabbitMQ
+  await publishToQueue('feed_fanout_queue_v3', {
+    actorId: userId,
+    activityType: 'LIKE',
+    targetId: targetId,
+    targetModel: targetModel,
+  });
+
+  return {
+    liked: true,
+    newLikeCount: updatedEntity.likeCount,
+  };
+};
 /**
  * Removes a like for a user on a specific track or playlist
  */

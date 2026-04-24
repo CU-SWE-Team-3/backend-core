@@ -4,14 +4,16 @@ const Block = require('../models/blockModel');
 const AppError = require('../utils/appError');
 const Track = require('../models/trackModel');
 const notificationService = require('./notificationService'); // Add this line
+// const Track = require('../models/trackModel');
+const FeedItem = require('../models/feedItemModel');
 
 exports.followUser = async (followerId, followingId) => {
   if (followerId.toString() === followingId.toString()) {
-    throw new Error('You cannot follow yourself.');
+    throw new AppError('You cannot follow yourself.', 400);
   }
 
   const userToFollow = await User.findById(followingId);
-  if (!userToFollow) throw new Error('User not found.');
+  if (!userToFollow) throw new AppError('User not found.', 404);
 
   // ==========================================
   // NEW: Check if there is a block in EITHER direction
@@ -37,7 +39,8 @@ exports.followUser = async (followerId, followingId) => {
     following: followingId,
   });
 
-  if (existingFollow) throw new Error('You are already following this user.');
+  if (existingFollow)
+    throw new AppError('You are already following this user.', 400);
 
   await Follow.create({ follower: followerId, following: followingId });
   await notificationService.notifyFollow(followingId, followerId);
@@ -68,8 +71,7 @@ exports.unfollowUser = async (followerId, followingId) => {
     follower: followerId,
     following: followingId,
   });
-
-  if (!follow) throw new Error('You are not following this user.');
+  if (!follow) throw new AppError('You are not following this user.', 400);
 
   // ==========================================
   // MODULE 10: RETRACT NOTIFICATION
@@ -95,36 +97,12 @@ exports.unfollowUser = async (followerId, followingId) => {
       { new: true }
     ).select('followerCount'),
   ]);
-
+  // Remove all of the unfollowed user's activities from the follower's feed inbox
+  await FeedItem.deleteMany({ ownerId: followerId, actorId: followingId });
   return {
     myFollowingCount: follower.followingCount,
     theirFollowerCount: following.followerCount,
   };
-};
-
-// FIX: returns recent tracks from followed artists — not user profiles
-// This is what a music feed is: content, not people
-exports.getUserFeed = async (userId) => {
-  const followingRels = await Follow.find({ follower: userId });
-  const followingIds = followingRels.map((rel) => rel.following);
-
-  if (followingIds.length === 0) return [];
-
-  const feed = await Track.find({
-    artist: { $in: followingIds },
-    isPublic: true,
-    moderationStatus: 'Approved',
-    processingState: 'Finished',
-    releaseDate: { $lte: new Date() },
-  })
-    .populate('artist', 'displayName permalink avatarUrl')
-    .select(
-      'title permalink artworkUrl hlsUrl waveform duration genre artist playCount likeCount createdAt'
-    )
-    .sort({ createdAt: -1 })
-    .limit(20);
-
-  return feed;
 };
 
 exports.getFollowers = async (userId, page = 1, limit = 20) => {
@@ -307,21 +285,6 @@ exports.blockUser = async (blockerId, blockedId) => {
   }
 
   return { status: 'blocked' };
-};
-
-exports.unblockUser = async (blockerId, blockedId) => {
-  const existingBlock = await Block.findOne({
-    blocker: blockerId,
-    blocked: blockedId,
-  });
-
-  if (!existingBlock) {
-    throw new AppError('User is not blocked', 404);
-  }
-
-  await Block.findByIdAndDelete(existingBlock._id);
-
-  return { status: 'unblocked' };
 };
 
 exports.unblockUser = async (blockerId, blockedId) => {

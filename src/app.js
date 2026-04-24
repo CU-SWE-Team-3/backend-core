@@ -12,6 +12,8 @@ const networkRoutes = require('./routes/networkRoutes');
 const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
 const historyRouter = require('./routes/historyRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const feedRoutes = require('./routes/feedRoutes');
+
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
@@ -119,7 +121,6 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-// This means all relationship routes will start with /api/users
 app.use('/api/network', networkRoutes);
 
 app.use('/api/profile', profileRoutes);
@@ -132,6 +133,7 @@ app.use('/api/comments', commentRoutes);
 
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/feed', feedRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes

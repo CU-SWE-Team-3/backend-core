@@ -15,23 +15,47 @@ connection.on('disconnect', (err) =>
 const channelWrapper = connection.createChannel({
   json: true,
   setup: async function (channel) {
-    // Setup Dead-Letter Exchange & Queue
-    const dlx = 'audio_dlx';
-    const dlq = 'audio_dead_letter_queue';
+    // ==========================================
+    // 1. AUDIO QUEUE SETUP
+    // ==========================================
+    const audioDlx = 'audio_dlx';
+    const audioDlq = 'audio_dead_letter_queue';
 
-    await channel.assertExchange(dlx, 'direct', { durable: true });
-    await channel.assertQueue(dlq, { durable: true });
-    await channel.bindQueue(dlq, dlx, 'failed_audio');
+    await channel.assertExchange(audioDlx, 'direct', { durable: true });
+    await channel.assertQueue(audioDlq, { durable: true });
+    await channel.bindQueue(audioDlq, audioDlx, 'failed_audio');
 
-    // Setup Main Queue and link it to the DLX
-    const queueName = 'audio_processing_queue_v3';
-    return channel.assertQueue(queueName, {
+    const audioQueue = 'audio_processing_queue_v4';
+    await channel.assertQueue(audioQueue, {
       durable: true,
       arguments: {
-        'x-dead-letter-exchange': dlx,
+        'x-dead-letter-exchange': audioDlx,
         'x-dead-letter-routing-key': 'failed_audio',
       },
     });
+
+    // ==========================================
+    // 2. FEED FAN-OUT QUEUE SETUP (NEW)
+    // ==========================================
+    const feedDlx = 'feed_dlx';
+    const feedDlq = 'feed_dead_letter_queue';
+
+    // Assert the Dead Letter Exchange and Queue for Feeds
+    await channel.assertExchange(feedDlx, 'direct', { durable: true });
+    await channel.assertQueue(feedDlq, { durable: true });
+    await channel.bindQueue(feedDlq, feedDlx, 'failed_feed');
+
+    // Assert the Main Feed Queue and link it to its DLX
+    const feedQueue = 'feed_fanout_queue_v3';
+    await channel.assertQueue(feedQueue, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': feedDlx,
+        'x-dead-letter-routing-key': 'failed_feed',
+      },
+    });
+
+    return true; // Setup complete
   },
 });
 

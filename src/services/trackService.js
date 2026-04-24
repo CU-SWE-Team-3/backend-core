@@ -301,7 +301,7 @@ exports.confirmUpload = async (trackId, userId) => {
 
   // 3. Drop the ticket into the RabbitMQ queue!
   // It only takes ~50 milliseconds to send this to the cloud.
-  await publishToQueue('audio_processing_queue_v3', ticketData);
+  await publishToQueue('audio_processing_queue_v4', ticketData);
 
   // ==========================================
   // MODULE 10: NEW TRACK NOTIFICATION

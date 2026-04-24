@@ -53,8 +53,9 @@ exports.addComment = async (
     parentComment: parentCommentId || null,
   });
 
-  await Track.findByIdAndUpdate(trackId, { $inc: { commentCount: 1 } });
-
+  await Track.findByIdAndUpdate(trackId, {
+    $inc: { commentCount: 1, viralScore: 2 },
+  });
   // ==========================================
   // MODULE 10: NOTIFICATION TRIGGERS
   // ==========================================
@@ -156,15 +157,24 @@ exports.deleteComment = async (userId, commentId) => {
 
   await Comment.deleteOne({ _id: comment._id });
 
-  // 1. Assign the update to a variable so we can access the track's artist ID
-  const track = await Track.findByIdAndUpdate(comment.track, {
-    $inc: { commentCount: -deletedCount },
-  });
+  const totalScoreLoss = deletedCount * 2;
 
-  // ==========================================
-  // MODULE 10: RETRACT NOTIFICATION
-  // Remove the "User X commented on your track" notification
-  // ==========================================
+  // SAFE FLOOR UPDATE
+  await Track.findByIdAndUpdate(comment.track, [
+    {
+      $set: {
+        // Floor the commentCount at 0
+        commentCount: {
+          $max: [0, { $subtract: ['$commentCount', deletedCount] }],
+        },
+
+        // Floor the viralScore at 0
+        viralScore: {
+          $max: [0, { $subtract: ['$viralScore', totalScoreLoss] }],
+        },
+      },
+    },
+  ]);
   if (track) {
     // Ensure imported at the top
     notificationService.retractNotification(
