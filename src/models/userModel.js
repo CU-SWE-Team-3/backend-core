@@ -170,6 +170,11 @@ const userSchema = new mongoose.Schema(
     // ==========================================
     followerCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
+    lastActiveAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
   {
     timestamps: true,

@@ -36,6 +36,16 @@ exports.protect = catchAsync(async (req, res, next) => {
     }
 
     req.user = currentUser;
+
+    // NEW: ACTIVE USER TRACKING (Ghost Town Fix)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    if (!req.user.lastActiveAt || req.user.lastActiveAt < oneHourAgo) {
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { lastActiveAt: new Date() },
+        { timestamps: false }
+      );
+    }
     next();
   } catch (error) {
     // 🟢 FIX 3: Catch JWT errors (like expired tokens) and send 401 directly

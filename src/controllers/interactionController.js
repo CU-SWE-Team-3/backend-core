@@ -3,19 +3,35 @@ const catchAsync = require('../utils/catchAsync');
 
 exports.createRepost = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { id: trackId } = req.params;
-  const result = await interactionService.addRepost(userId, trackId);
+  // Support taking the ID from the URL OR the body
+  const targetId = req.params.id || req.body.targetId;
+  // Default to 'Track' if they don't provide a targetModel
+  const targetModel = req.body.targetModel || 'Track';
+
+  const result = await interactionService.addRepost(
+    userId,
+    targetId,
+    targetModel
+  );
+
   res.status(201).json({
     success: true,
-    message: 'Track reposted successfully',
+    message: `${targetModel} reposted successfully`,
     data: result,
   });
 });
 
 exports.deleteRepost = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { id: trackId } = req.params;
-  const result = await interactionService.removeRepost(userId, trackId);
+  const targetId = req.params.id || req.body.targetId;
+  const targetModel = req.body.targetModel || 'Track';
+
+  const result = await interactionService.removeRepost(
+    userId,
+    targetId,
+    targetModel
+  );
+
   res.status(200).json({
     success: true,
     message: 'Repost removed successfully',
@@ -108,22 +124,38 @@ exports.getUserLikesFeed = catchAsync(async (req, res) => {
 // BE-1: Yehia's Like Controllers
 exports.createLike = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { id: trackId } = req.params;
-  const result = await interactionService.addLike(userId, trackId);
+  // Support taking the ID from the URL OR the body
+  const targetId = req.params.id || req.body.targetId;
+  // Default to 'Track' if they don't provide a targetModel
+  const targetModel = req.body.targetModel || 'Track';
+
+  const result = await interactionService.addLike(
+    userId,
+    targetId,
+    targetModel
+  );
+
   res.status(201).json({
     success: true,
-    message: 'Track liked successfully',
+    message: `${targetModel} liked successfully`,
     data: result,
   });
 });
 
 exports.deleteLike = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { id: trackId } = req.params;
-  const result = await interactionService.removeLike(userId, trackId);
+  const targetId = req.params.id || req.body.targetId;
+  const targetModel = req.body.targetModel || 'Track';
+
+  const result = await interactionService.removeLike(
+    userId,
+    targetId,
+    targetModel
+  );
+
   res.status(200).json({
     success: true,
-    message: 'Like removed successfully',
+    message: `Like removed successfully`,
     data: result,
   });
 });

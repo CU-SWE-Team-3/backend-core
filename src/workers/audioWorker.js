@@ -9,6 +9,7 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const { generateRealWaveform } = require('../utils/audioUtils');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
+const { publishToQueue } = require('../utils/queueProducer');
 
 if (!global.crypto) {
   global.crypto = require('node:crypto').webcrypto;
@@ -53,7 +54,7 @@ const startWorker = async () => {
       await channel.bindQueue(dlq, dlx, 'failed_audio');
 
       // Assert Main Queue with Dead-Letter Arguments
-      const queueName = 'audio_processing_queue_v3';
+      const queueName = 'audio_processing_queue_v4';
       await channel.assertQueue(queueName, {
         durable: true,
         arguments: {
@@ -166,7 +167,16 @@ const startWorker = async () => {
               duration: realDurationSeconds,
               waveform: waveformData,
             });
-
+            // NEW: Publish to Feed Fan-out Queue if the track is public
+            const finishedTrack = await Track.findById(ticket.trackId);
+            if (finishedTrack && finishedTrack.isPublic) {
+              await publishToQueue('feed_fanout_queue_v3', {
+                actorId: finishedTrack.artist,
+                activityType: 'TRACK_UPLOAD',
+                targetId: finishedTrack._id,
+                targetModel: 'Track',
+              });
+            }
             fs.rmSync(tempDir, { recursive: true, force: true });
             console.log(
               `✅ [Worker] SUCCESS! Track ${ticket.trackId} is fully processed and on Azure.`
