@@ -64,5 +64,6 @@ router.patch(
   validate(adminValidation.idParamSchema), // <-- Updated name
   adminController.restoreTrackContent
 );
+router.post('/broadcast', protect, adminController.broadcastToAllUsers);
 
 module.exports = router;

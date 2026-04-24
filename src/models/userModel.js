@@ -40,6 +40,15 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    notificationPreferences: {
+      likes: { type: Boolean, default: true },
+      reposts: { type: Boolean, default: true },
+      comments: { type: Boolean, default: true },
+      newFollowers: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      newTracks: { type: Boolean, default: true },
+      mentions: { type: Boolean, default: true },
+    },
     password: {
       type: String,
       required: function () {
@@ -129,6 +138,7 @@ const userSchema = new mongoose.Schema(
       enum: ['Artist', 'Listener', 'Admin'],
       default: 'Listener',
     },
+
     isPrivate: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
     isEmailVerified: { type: Boolean, default: false },
@@ -170,6 +180,11 @@ const userSchema = new mongoose.Schema(
     // ==========================================
     followerCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
+    lastActiveAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
   {
     timestamps: true,

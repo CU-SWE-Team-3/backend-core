@@ -5,8 +5,35 @@ const Block = require('../models/blockModel');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
 const { getIo, connectedUsers } = require('../sockets/socketSetup');
+const notificationService = require('./notificationService');
 
 const TIME_LIMIT_MS = 15 * 60 * 1000; // 15 Minutes
+
+const checkIfUserActiveInRoom = (userId, conversationId) => {
+  try {
+    const io = getIo();
+
+    // 1. Get the user's current socket ID
+    const socketId = connectedUsers.get(userId.toString());
+
+    // If they have no socket ID, they are completely offline
+    if (!socketId) return false;
+
+    // 2. Look at the specific conversation room
+    const roomName = `chat_${conversationId}`;
+    const room = io.sockets.adapter.rooms.get(roomName);
+
+    // 3. Check if their socket ID is inside that room
+    if (room && room.has(socketId)) {
+      return true; // They are online AND looking at this exact chat!
+    }
+
+    return false; // They are online, but looking at a different screen/chat
+  } catch (error) {
+    console.error('Error checking room activity:', error);
+    return false;
+  }
+};
 
 exports.editMessage = async (messageId, userId, content) => {
   const message = await Message.findById(messageId);
@@ -172,7 +199,6 @@ exports.sendMessage = async (
   conversation.lastMessage = newMessage._id;
   conversation.markModified('unreadCounts');
   await conversation.save();
-
   // 5. Emit real-time WebSocket event IF the receiver is online
   const io = getIo();
 
@@ -182,11 +208,30 @@ exports.sendMessage = async (
 
     newMessage.status = 'delivered';
     await newMessage.save();
-  } else {
-    // PREPARATION FOR MODULE 10:
-    // If the user is offline, this is where you will eventually trigger
-    // an entry in the Notifications DB and send a Push Notification!
   }
+
+  // ==========================================
+  // MODULE 10: NOTIFICATION TRIGGER
+  // ==========================================
+  // We determine what text to show in the notification dropdown.
+  // If they sent text, show it. If they sent a track/playlist, say so!
+  let notificationText = content;
+  if (!notificationText && attachment) {
+    notificationText = `Shared a ${attachment.type} with you`;
+  }
+
+  const isUserBInChat = checkIfUserActiveInRoom(receiverId, conversation._id);
+
+  // CORRECTED: Added the closing bracket for this if statement
+  if (!isUserBInChat) {
+    // Only fire push notification if they are NOT looking at the chat
+    notificationService.notifyMessage(
+      receiverId,
+      senderId,
+      newMessage._id,
+      notificationText
+    );
+  } //
 
   return newMessage;
 };
@@ -206,7 +251,7 @@ exports.markMessagesAsRead = async (conversationId, userId) => {
     {
       conversationId: conversationId,
       senderId: { $ne: userId }, // We only mark messages sent TO us as read
-      status: 'delivered',
+      status: { $ne: 'read' },
     },
     {
       $set: { status: 'read' },

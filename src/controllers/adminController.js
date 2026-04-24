@@ -1,6 +1,9 @@
 // src/controllers/adminController.js
 const adminService = require('../services/adminService');
 const catchAsync = require('../utils/catchAsync');
+const notificationService = require('../services/notificationService');
+const User = require('../models/userModel');
+const AppError = require('../utils/appError');
 
 exports.getDashboardStats = catchAsync(async (req, res, next) => {
   const stats = await adminService.getPlatformAnalytics();
@@ -84,5 +87,29 @@ exports.restoreTrackContent = catchAsync(async (req, res, next) => {
       isPublic: track.isPublic,
       moderationStatus: track.moderationStatus,
     },
+  });
+});
+exports.broadcastToAllUsers = catchAsync(async (req, res, next) => {
+  const { message, actionLink } = req.body;
+
+  if (!message) {
+    return next(new AppError('Broadcast message is required.', 400));
+  }
+
+  // 1. Fetch ALL user IDs from the database
+  // We use .select('_id') to make the query extremely fast and lightweight
+  const users = await User.find({}).select('_id');
+
+  // 2. Loop through all users and trigger the system notification
+  // Promise.all ensures they are sent concurrently for maximum speed
+  const broadcastPromises = users.map((user) =>
+    notificationService.notifySystem(user._id, message, actionLink)
+  );
+
+  await Promise.all(broadcastPromises);
+
+  res.status(200).json({
+    success: true,
+    message: `System broadcast successfully sent to ${users.length} users.`,
   });
 });

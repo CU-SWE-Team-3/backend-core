@@ -246,10 +246,14 @@ const trackSchema = new mongoose.Schema(
       default: 20,
       min: [0, 'Preview end time cannot be negative'],
     },
+    isPromoted: {
+      type: Boolean,
+      default: false,
+    },
     viralScore: {
       type: Number,
       default: 0,
-      index: true, // 👈 VERY IMPORTANT for speed!
+      index: true,
     },
   },
   {

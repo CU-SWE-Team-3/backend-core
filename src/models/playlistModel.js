@@ -110,7 +110,7 @@ const playlistSchema = new mongoose.Schema(
     viralScore: {
       type: Number,
       default: 0,
-      index: true, // 👈 VERY IMPORTANT for speed!
+      index: true,
     },
   },
   {

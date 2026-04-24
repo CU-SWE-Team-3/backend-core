@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"node server.js\" \"node src/workers/audioWorker.js\"",
-    "dev": "concurrently \"nodemon server.js\" \"nodemon src/workers/audioWorker.js\"",
+    "start": "concurrently \"node server.js\" \"node src/workers/audioWorker.js\" \"node src/workers/feedWorker.js\"",
+    "dev": "concurrently \"nodemon server.js\" \"nodemon src/workers/audioWorker.js\" \"nodemon src/workers/feedWorker.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "jest --coverage --forceExit --runInBand"

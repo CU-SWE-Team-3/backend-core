@@ -7,6 +7,8 @@ const {
 const Track = require('../models/trackModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 const { publishToQueue } = require('../utils/queueProducer');
+const notificationService = require('./notificationService');
+const Follow = require('../models/followModel');
 const AppError = require('../utils/appError');
 // ==========================================
 // BE-3: METADATA & VISIBILITY LOGIC
@@ -299,7 +301,31 @@ exports.confirmUpload = async (trackId, userId) => {
 
   // 3. Drop the ticket into the RabbitMQ queue!
   // It only takes ~50 milliseconds to send this to the cloud.
-  await publishToQueue('audio_processing_queue_v3', ticketData);
+  await publishToQueue('audio_processing_queue_v4', ticketData);
+
+  // ==========================================
+  // MODULE 10: NEW TRACK NOTIFICATION
+  // ==========================================
+  // We use a Promise chain here so it runs entirely in the background
+  // and doesn't block the user's upload confirmation response.
+  if (track.isPublic) {
+    Follow.find({ following: userId })
+      .then((followers) => {
+        followers.forEach((followDoc) => {
+          notificationService.notifyNewTrack(
+            followDoc.follower, // Recipient
+            userId, // Actor (The Artist)
+            track._id // Target (The Track)
+          );
+        });
+      })
+      .catch((err) => {
+        console.error(
+          '[Notification Error] Failed to fetch followers for new track alert:',
+          err
+        );
+      });
+  }
 
   // 4. Return immediately to the user so the frontend doesn't hang
   return track;

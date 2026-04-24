@@ -11,6 +11,8 @@ const subscriptionController = require('./controllers/subscriptionController');
 const networkRoutes = require('./routes/networkRoutes');
 const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
 const historyRouter = require('./routes/historyRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const feedRoutes = require('./routes/feedRoutes');
 
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -111,6 +113,7 @@ app.use(mongoSanitize());
 app.use('/.well-known', express.static(path.join(__dirname, '.well-known')));
 app.use('/api/history', historyRouter);
 app.use('/api/messages', messageRoutes); // <--- NEW: Mount message routes
+app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
@@ -119,7 +122,6 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-// This means all relationship routes will start with /api/users
 app.use('/api/network', networkRoutes);
 
 app.use('/api/profile', profileRoutes);
@@ -133,6 +135,7 @@ app.use('/api/discovery', discoveryRoutes);
 
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/feed', feedRoutes);
 // ==========================================
 // 3. UNHANDLED ROUTES (404 catch-all)
 // Must come AFTER all your real routes
