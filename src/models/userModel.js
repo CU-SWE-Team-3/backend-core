@@ -221,4 +221,9 @@ userSchema.methods.toJSON = function () {
   return userObject;
 };
 
+userSchema.index(
+  { displayName: 'text', permalink: 'text' },
+  { weights: { displayName: 5, permalink: 3 }, name: 'UserTextIndex' }
+);
+userSchema.index({ displayName: 'text' });
 module.exports = mongoose.model('User', userSchema);

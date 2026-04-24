@@ -135,6 +135,10 @@ playlistSchema.methods.toJSON = function () {
   }
   return playlist;
 };
+playlistSchema.index(
+  { title: 'text', tags: 'text' },
+  { weights: { title: 5, tags: 2 }, name: 'PlaylistTextIndex' }
+);
 
 const Playlist = mongoose.model('Playlist', playlistSchema);
 

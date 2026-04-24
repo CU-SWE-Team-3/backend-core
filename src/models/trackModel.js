@@ -99,6 +99,11 @@ const trackSchema = new mongoose.Schema(
       default: 'Approved', // Controlled ONLY by Admins
     },
 
+    isPromoted: {
+      type: Boolean,
+      default: false, // Forces all normal tracks to be "false" so frontend doesn't break
+    },
+
     // ==========================================
     // BE-2: AUDIO PIPELINE (Placeholders)
     // ==========================================
@@ -265,6 +270,12 @@ trackSchema.index({ processingState: 1 });
 trackSchema.index({ createdAt: -1 }); // Crucial for chronological feed sorting
 trackSchema.index({ genre: 1, viralScore: -1 });
 trackSchema.index({ viralScore: -1 });
+
+trackSchema.index(
+  { title: 'text', tags: 'text' },
+  { weights: { title: 5, tags: 2 }, name: 'TrackTextIndex' }
+);
+
 const Track = mongoose.model('Track', trackSchema);
 
 module.exports = Track;
