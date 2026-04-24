@@ -2,6 +2,8 @@ const Follow = require('../models/followModel');
 const User = require('../models/userModel');
 const Block = require('../models/blockModel');
 const AppError = require('../utils/appError');
+const Track = require('../models/trackModel');
+const notificationService = require('./notificationService'); // Add this line
 // const Track = require('../models/trackModel');
 const FeedItem = require('../models/feedItemModel');
 
@@ -41,7 +43,7 @@ exports.followUser = async (followerId, followingId) => {
     throw new AppError('You are already following this user.', 400);
 
   await Follow.create({ follower: followerId, following: followingId });
-
+  await notificationService.notifyFollow(followingId, followerId);
   const [follower, following] = await Promise.all([
     User.findByIdAndUpdate(
       followerId,
@@ -70,6 +72,18 @@ exports.unfollowUser = async (followerId, followingId) => {
     following: followingId,
   });
   if (!follow) throw new AppError('You are not following this user.', 400);
+
+  // ==========================================
+  // MODULE 10: RETRACT NOTIFICATION
+  // Remove the "User X started following you" notification
+  // ==========================================
+  // Ensure this is imported at the top of your file
+  notificationService.retractNotification(
+    followingId,
+    followerId,
+    'FOLLOW',
+    followerId
+  );
 
   const [follower, following] = await Promise.all([
     User.findByIdAndUpdate(

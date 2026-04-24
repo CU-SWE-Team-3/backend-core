@@ -4,9 +4,10 @@ const AppError = require('../utils/appError');
 const { publishToQueue } = require('../utils/queueProducer');
 const FeedItem = require('../models/feedItemModel');
 const Playlist = require('../models/playlistModel');
+const notificationService = require('./notificationService'); // 👈 ADDED: Notification Service
 
 /**
- * Adds a repost for a user on a specific track
+ * Adds a repost for a user on a specific track or playlist
  */
 exports.addRepost = async (userId, targetId, targetModel = 'Track') => {
   // 1. DYNAMIC MODEL SELECTION
@@ -55,6 +56,10 @@ exports.addRepost = async (userId, targetId, targetModel = 'Track') => {
     targetModel: targetModel, // Tells the worker what kind of entity this is
   });
 
+  // 👈 ADDED: Trigger Notification (dynamically gets artist or creator)
+  const ownerId = entity.artist || entity.creator;
+  notificationService.notifyRepost(ownerId, userId, targetId, targetModel);
+
   return {
     reposted: true,
     newRepostCount: updatedEntity.repostCount,
@@ -62,7 +67,7 @@ exports.addRepost = async (userId, targetId, targetModel = 'Track') => {
 };
 
 /**
- * Removes a repost for a user on a specific track
+ * Removes a repost for a user on a specific track or playlist
  */
 exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
   // 1. DYNAMIC MODEL SELECTION
@@ -104,11 +109,12 @@ exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
     targetModel: targetModel,
   });
 
+  // 👈 ADDED: Retract Notification
+  const ownerId = entity.artist || entity.creator;
+  notificationService.retractNotification(ownerId, userId, 'REPOST', targetId);
+
   return { reposted: false };
 };
-/**
- * Fetches users who engaged with a track (Likes or Reposts)
- */
 /**
  * Fetches users who engaged with a track (Likes or Reposts)
  */
@@ -288,7 +294,7 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
 };
 
 /**
- * Adds a like for a user on a specific track (BE-1: Yehia)
+ * Adds a like for a user on a specific track or playlist
  */
 exports.addLike = async (userId, targetId, targetModel = 'Track') => {
   // 1. DYNAMIC MODEL SELECTION
@@ -337,13 +343,31 @@ exports.addLike = async (userId, targetId, targetModel = 'Track') => {
     targetModel: targetModel,
   });
 
+  // 👈 ADDED: Trigger Notification (dynamically gets artist or creator)
+  const ownerId = entity.artist || entity.creator;
+  notificationService.notifyLike(ownerId, userId, targetId, targetModel);
+
+  return {
+    liked: true,
+    newLikeCount: updatedEntity.likeCount,
+  };
+};
+
+  // Publish Polymorphic Data to RabbitMQ
+  await publishToQueue('feed_fanout_queue_v3', {
+    actorId: userId,
+    activityType: 'LIKE',
+    targetId: targetId,
+    targetModel: targetModel,
+  });
+
   return {
     liked: true,
     newLikeCount: updatedEntity.likeCount,
   };
 };
 /**
- * Removes a like for a user on a specific track (BE-1: Yehia)
+ * Removes a like for a user on a specific track or playlist
  */
 exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
   // 1. DYNAMIC MODEL SELECTION
@@ -385,6 +409,10 @@ exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
     targetId: targetId,
     targetModel: targetModel,
   });
+
+  // 👈 ADDED: Retract Notification
+  const ownerId = entity.artist || entity.creator;
+  notificationService.retractNotification(ownerId, userId, 'LIKE', targetId);
 
   return { liked: false };
 };
