@@ -40,7 +40,7 @@ exports.followUser = async (followerId, followingId) => {
   if (existingFollow) throw new Error('You are already following this user.');
 
   await Follow.create({ follower: followerId, following: followingId });
-  notificationService.notifyFollow(followingId, followerId);
+  await notificationService.notifyFollow(followingId, followerId);
   const [follower, following] = await Promise.all([
     User.findByIdAndUpdate(
       followerId,
