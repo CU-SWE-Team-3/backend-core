@@ -263,7 +263,8 @@ const trackSchema = new mongoose.Schema(
 trackSchema.index({ artist: 1 });
 trackSchema.index({ processingState: 1 });
 trackSchema.index({ createdAt: -1 }); // Crucial for chronological feed sorting
-
+trackSchema.index({ genre: 1, viralScore: -1 });
+trackSchema.index({ viralScore: -1 });
 const Track = mongoose.model('Track', trackSchema);
 
 module.exports = Track;
