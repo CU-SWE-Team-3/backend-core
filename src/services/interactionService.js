@@ -1,94 +1,121 @@
 const Interaction = require('../models/interactionModel');
 const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
-const notificationService = require('./notificationService');
+const { publishToQueue } = require('../utils/queueProducer');
+const FeedItem = require('../models/feedItemModel');
 const Playlist = require('../models/playlistModel');
-
-const Block = require('../models/blockModel');
+const notificationService = require('./notificationService'); // 👈 ADDED: Notification Service
 
 /**
- * Adds a repost for a user on a specific track
+ * Adds a repost for a user on a specific track or playlist
  */
-exports.addRepost = async (userId, trackId) => {
-  const track = await Track.findById(trackId);
-  if (!track) {
-    throw new AppError('Track not found', 404);
-  }
-  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
-  // Check if either user has blocked the other
-  const blockRecord = await Block.findOne({
-    $or: [
-      { blocker: track.artist, blocked: userId }, // The Artist blocked the Commenter/Liker
-      { blocker: userId, blocked: track.artist }, // The Commenter/Liker blocked the Artist
-    ],
-  });
+exports.addRepost = async (userId, targetId, targetModel = 'Track') => {
+  // 1. DYNAMIC MODEL SELECTION
+  const Model = targetModel === 'Playlist' ? Playlist : Track;
 
-  if (blockRecord) {
-    throw new AppError(
-      'You are blocked from interacting with this user (or you have blocked them).',
-      403
-    );
+  // Verify the entity exists
+  const entity = await Model.findById(targetId);
+  if (!entity) {
+    throw new AppError(`${targetModel} not found`, 404);
   }
-  // -------------------------------------------------------
 
+  // Check for idempotency (prevent double reposts)
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
     actionType: 'REPOST',
   });
 
   if (existingInteraction) {
-    throw new AppError('You have already reposted this track', 400);
+    throw new AppError(
+      `You have already reposted this ${targetModel.toLowerCase()}`,
+      400
+    );
   }
 
-  // Create interaction and increment counter
+  // Create interaction
   await Interaction.create({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
+    targetModel: targetModel, // 👈 CRITICAL: Save the model type in the DB!
     actionType: 'REPOST',
   });
-  await Track.findByIdAndUpdate(trackId, { $inc: { repostCount: 1 } });
 
-  // REPLACE YOUR TODO WITH THIS:
-  notificationService.notifyRepost(track.artist, userId, trackId);
+  // Increment the repost counter dynamically
+  const updatedEntity = await Model.findByIdAndUpdate(
+    targetId,
+    { $inc: { repostCount: 1, viralScore: 10 } },
+    { new: true }
+  );
 
-  return { reposted: true };
+  // Publish Polymorphic Data to RabbitMQ
+  await publishToQueue('feed_fanout_queue_v3', {
+    actorId: userId,
+    activityType: 'REPOST',
+    targetId: targetId,
+    targetModel: targetModel, // Tells the worker what kind of entity this is
+  });
+
+  // 👈 ADDED: Trigger Notification (dynamically gets artist or creator)
+  const ownerId = entity.artist || entity.creator;
+  notificationService.notifyRepost(ownerId, userId, targetId, targetModel);
+
+  return {
+    reposted: true,
+    newRepostCount: updatedEntity.repostCount,
+  };
 };
 
 /**
- * Removes a repost for a user on a specific track
+ * Removes a repost for a user on a specific track or playlist
  */
-exports.removeRepost = async (userId, trackId) => {
-  const track = await Track.findById(trackId);
-  if (!track) {
-    throw new AppError('Track not found', 404);
+exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
+  // 1. DYNAMIC MODEL SELECTION
+  const Model = targetModel === 'Playlist' ? Playlist : Track;
+
+  const entity = await Model.findById(targetId);
+  if (!entity) {
+    throw new AppError(`${targetModel} not found`, 404);
   }
 
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
     actionType: 'REPOST',
   });
 
   if (!existingInteraction) {
-    throw new AppError('You have not reposted this track', 400);
+    throw new AppError(
+      `You have not reposted this ${targetModel.toLowerCase()}`,
+      400
+    );
   }
 
-  // Delete interaction and decrement counter
+  // Delete interaction and decrement counter dynamically
   await Interaction.findByIdAndDelete(existingInteraction._id);
-  await Track.findByIdAndUpdate(trackId, { $inc: { repostCount: -1 } });
-  notificationService.retractNotification(
-    track.artist,
-    userId,
-    'REPOST',
-    trackId
-  );
+  await Model.findByIdAndUpdate(targetId, [
+    {
+      $set: {
+        repostCount: { $max: [0, { $subtract: ['$repostCount', 1] }] },
+        viralScore: { $max: [0, { $subtract: ['$viralScore', 10] }] }, // Subtract the 10 points
+      },
+    },
+  ]);
+  // Cleanup the feed
+  await FeedItem.deleteMany({
+    actorId: userId,
+    activityType: 'REPOST',
+    targetId: targetId,
+    targetModel: targetModel,
+  });
+
+  // 👈 ADDED: Retract Notification
+  const ownerId = entity.artist || entity.creator;
+  notificationService.retractNotification(ownerId, userId, 'REPOST', targetId);
+
   return { reposted: false };
 };
 
-/**
- * Fetches users who engaged with a track (Likes or Reposts)
- */
 /**
  * Fetches users who engaged with a track (Likes or Reposts)
  */
@@ -145,15 +172,37 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
     .limit(limit)
     .populate({
       path: 'targetId',
-      match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
-      // NEW: Added this select to prevent sending backend-only track data to the frontend
-      select:
-        'title artworkurl duration audioUrl waveform playCount likeCount repostCount createdAt',
-      populate: {
-        path: 'artist',
-        // NEW: Also added role and isPremium here for the artist on the track card!
-        select: 'displayName permalink avatarUrl role isPremium',
+      // 1. MATCH: Allow Finished Tracks OR Playlists (which don't have processingState)
+      match: {
+        $and: [
+          {
+            $or: [
+              { processingState: 'Finished' },
+              { processingState: { $exists: false } }, // Playlists pass this!
+            ],
+          },
+          {
+            $or: [
+              { releaseDate: { $lte: new Date() } },
+              { releaseDate: { $exists: false } }, // Just in case it's unset
+            ],
+          },
+        ],
       },
+      // 2. SELECT: Ask for fields from BOTH models (Mongoose will just ignore what's missing)
+      select:
+        'title artworkUrl duration audioUrl waveform playCount likeCount repostCount createdAt trackCount artist creator',
+      // 3. NESTED POPULATE: Tell Mongoose to populate both owner fields!
+      populate: [
+        {
+          path: 'artist', // This will fire for Tracks
+          select: 'displayName permalink avatarUrl role isPremium',
+        },
+        {
+          path: 'creator', // This will fire for Playlists
+          select: 'displayName permalink avatarUrl role isPremium',
+        },
+      ],
     });
 
   const total = await Interaction.countDocuments({
@@ -166,7 +215,8 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
     .filter((interaction) => interaction.targetId != null)
     .map((interaction) => ({
       repostDate: interaction.createdAt,
-      track: interaction.targetId,
+      target: interaction.targetId,
+      targetModel: interaction.targetModel,
     }));
 
   return {
@@ -189,15 +239,37 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
     .limit(limit)
     .populate({
       path: 'targetId',
-      match: { processingState: 'Finished', releaseDate: { $lte: new Date() } },
-      // NEW: Added this select to prevent sending backend-only track data to the frontend
-      select:
-        'title artworkurl duration audioUrl waveform playCount likeCount repostCount createdAt',
-      populate: {
-        path: 'artist',
-        // NEW: Also added role and isPremium here for the artist on the track card!
-        select: 'displayName permalink avatarUrl role isPremium',
+      // 1. MATCH: Allow Finished Tracks OR Playlists (which don't have processingState)
+      match: {
+        $and: [
+          {
+            $or: [
+              { processingState: 'Finished' },
+              { processingState: { $exists: false } }, // Playlists pass this!
+            ],
+          },
+          {
+            $or: [
+              { releaseDate: { $lte: new Date() } },
+              { releaseDate: { $exists: false } }, // Just in case it's unset
+            ],
+          },
+        ],
       },
+      // 2. SELECT: Ask for fields from BOTH models (Mongoose will just ignore what's missing)
+      select:
+        'title artworkUrl duration audioUrl waveform playCount likeCount repostCount createdAt trackCount artist creator',
+      // 3. NESTED POPULATE: Tell Mongoose to populate both owner fields!
+      populate: [
+        {
+          path: 'artist', // This will fire for Tracks
+          select: 'displayName permalink avatarUrl role isPremium',
+        },
+        {
+          path: 'creator', // This will fire for Playlists
+          select: 'displayName permalink avatarUrl role isPremium',
+        },
+      ],
     });
 
   const total = await Interaction.countDocuments({
@@ -210,7 +282,8 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
     .filter((interaction) => interaction.targetId != null)
     .map((interaction) => ({
       likeDate: interaction.createdAt,
-      track: interaction.targetId,
+      target: interaction.targetId,
+      targetModel: interaction.targetModel, // Pass this so the frontend knows what UI card to draw!
     }));
 
   return {
@@ -222,133 +295,112 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
 };
 
 /**
- * Adds a like for a user on a specific track (BE-1: Yehia)
+ * Adds a like for a user on a specific track or playlist
  */
-exports.addLike = async (userId, trackId) => {
-  const track = await Track.findById(trackId);
-  if (!track) {
-    throw new AppError('Track not found', 404);
-  }
-  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
-  const blockRecord = await Block.findOne({
-    $or: [
-      { blocker: track.artist, blocked: userId },
-      { blocker: userId, blocked: track.artist },
-    ],
-  });
+exports.addLike = async (userId, targetId, targetModel = 'Track') => {
+  // 1. DYNAMIC MODEL SELECTION
+  const Model = targetModel === 'Playlist' ? Playlist : Track;
 
-  if (blockRecord) {
-    throw new AppError('You are blocked from interacting with this user.', 403);
+  // Verify the entity exists
+  const entity = await Model.findById(targetId);
+  if (!entity) {
+    throw new AppError(`${targetModel} not found`, 404);
   }
-  // -------------------------------------------------------
+
+  // Check for idempotency (prevent double likes)
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
     actionType: 'LIKE',
   });
 
   if (existingInteraction) {
-    throw new AppError('You have already liked this track', 400);
+    throw new AppError(
+      `You have already liked this ${targetModel.toLowerCase()}`,
+      400
+    );
   }
 
-  // Create interaction and increment like counter
+  // Create interaction
   await Interaction.create({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
+    targetModel: targetModel, // 👈 CRITICAL: Save the model type in the DB!
     actionType: 'LIKE',
   });
-  await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: 1 } });
-  notificationService.notifyLike(track.artist, userId, trackId);
-  return { liked: true };
+
+  // Increment the like counter dynamically
+  const updatedEntity = await Model.findByIdAndUpdate(
+    targetId,
+    { $inc: { likeCount: 1, viralScore: 3 } },
+    { new: true }
+  );
+
+  // Publish Polymorphic Data to RabbitMQ
+  await publishToQueue('feed_fanout_queue_v3', {
+    actorId: userId,
+    activityType: 'LIKE',
+    targetId: targetId,
+    targetModel: targetModel,
+  });
+
+  // 👈 ADDED: Trigger Notification (dynamically gets artist or creator)
+  const ownerId = entity.artist || entity.creator;
+  notificationService.notifyLike(ownerId, userId, targetId, targetModel);
+
+  return {
+    liked: true,
+    newLikeCount: updatedEntity.likeCount,
+  };
 };
 
 /**
- * Removes a like for a user on a specific track (BE-1: Yehia)
+ * Removes a like for a user on a specific track or playlist
  */
-exports.removeLike = async (userId, trackId) => {
-  const track = await Track.findById(trackId);
-  if (!track) {
-    throw new AppError('Track not found', 404);
+exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
+  // 1. DYNAMIC MODEL SELECTION
+  const Model = targetModel === 'Playlist' ? Playlist : Track;
+
+  const entity = await Model.findById(targetId);
+  if (!entity) {
+    throw new AppError(`${targetModel} not found`, 404);
   }
 
   const existingInteraction = await Interaction.findOne({
     actorId: userId,
-    targetId: trackId,
+    targetId: targetId,
     actionType: 'LIKE',
   });
 
   if (!existingInteraction) {
-    throw new AppError('You have not liked this track', 400);
+    throw new AppError(
+      `You have not liked this ${targetModel.toLowerCase()}`,
+      400
+    );
   }
 
-  // Delete interaction and decrement counter
+  // Delete interaction and decrement counter dynamically
   await Interaction.findByIdAndDelete(existingInteraction._id);
-  await Track.findByIdAndUpdate(trackId, { $inc: { likeCount: -1 } });
-
-  notificationService.retractNotification(
-    track.artist,
-    userId,
-    'LIKE',
-    trackId
-  );
-  return { liked: false };
-};
-exports.addPlaylistLike = async (userId, playlistId) => {
-  const playlist = await Playlist.findById(playlistId);
-  if (!playlist) throw new AppError('Playlist not found', 404);
-  // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
-  // Check if either user has blocked the other
-  const blockRecord = await Block.findOne({
-    $or: [
-      { blocker: playlist.creator, blocked: userId },
-      { blocker: userId, blocked: playlist.creator },
-    ],
-  });
-
-  if (blockRecord) {
-    throw new AppError('You are blocked from interacting with this user.', 403);
-  }
-  // -------------------------------------------------------
-
-  // Your existing interaction creation logic...
-  await Interaction.create({
+  await Model.findByIdAndUpdate(targetId, [
+    // 👈 Array brackets for pipeline
+    {
+      $set: {
+        likeCount: { $max: [0, { $subtract: ['$likeCount', 1] }] },
+        viralScore: { $max: [0, { $subtract: ['$viralScore', 3] }] }, // Subtract the 3 points
+      },
+    },
+  ]);
+  // Cleanup the feed
+  await FeedItem.deleteMany({
     actorId: userId,
-    targetId: playlistId,
-    actionType: 'LIKE',
+    activityType: 'LIKE',
+    targetId: targetId,
+    targetModel: targetModel,
   });
-  await Playlist.findByIdAndUpdate(playlistId, { $inc: { likeCount: 1 } });
 
-  // MODULE 10 TRIGGER
-
-  if (playlist.creator.toString() !== userId.toString()) {
-    notificationService.notifyLike(playlist.creator, userId, playlistId);
-  }
-
-  return { liked: true };
-};
-
-/**
- * Removes a like for a playlist
- */
-exports.removePlaylistLike = async (userId, playlistId) => {
-  const playlist = await Playlist.findById(playlistId);
-  if (!playlist) throw new AppError('Playlist not found', 404);
-
-  await Interaction.findOneAndDelete({
-    actorId: userId,
-    targetId: playlistId,
-    actionType: 'LIKE',
-  });
-  await Playlist.findByIdAndUpdate(playlistId, { $inc: { likeCount: -1 } });
-
-  // MODULE 10 UNDO TRIGGER
-
-  notificationService.retractNotification(
-    playlist.creator,
-    userId,
-    'LIKE',
-    playlistId
-  );
+  // 👈 ADDED: Retract Notification
+  const ownerId = entity.artist || entity.creator;
+  notificationService.retractNotification(ownerId, userId, 'LIKE', targetId);
 
   return { liked: false };
 };

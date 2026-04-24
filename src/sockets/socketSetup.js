@@ -70,6 +70,18 @@ const initializeSockets = (server) => {
       }
     })();
 
+    // to handle the case when a user has been offline and has received messages, we want to mark those messages as 'delivered' as soon as they come online. This way, the sender gets accurate delivery status updates.
+    socket.on('join_chat', ({ conversationId }) => {
+      // Join a unique room specifically for this conversation
+      socket.join(`chat_${conversationId}`);
+      console.log(`User ${socket.user.id} opened chat ${conversationId}`);
+    });
+
+    socket.on('leave_chat', ({ conversationId }) => {
+      // Leave the room when they close the chat
+      socket.leave(`chat_${conversationId}`);
+      console.log(`User ${socket.user.id} closed chat ${conversationId}`);
+    });
     // ==========================================
     // FULL IMPLEMENTATION: MARK AS READ
     // ==========================================

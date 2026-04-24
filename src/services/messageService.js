@@ -9,6 +9,32 @@ const notificationService = require('./notificationService');
 
 const TIME_LIMIT_MS = 15 * 60 * 1000; // 15 Minutes
 
+const checkIfUserActiveInRoom = (userId, conversationId) => {
+  try {
+    const io = getIo();
+
+    // 1. Get the user's current socket ID
+    const socketId = connectedUsers.get(userId.toString());
+
+    // If they have no socket ID, they are completely offline
+    if (!socketId) return false;
+
+    // 2. Look at the specific conversation room
+    const roomName = `chat_${conversationId}`;
+    const room = io.sockets.adapter.rooms.get(roomName);
+
+    // 3. Check if their socket ID is inside that room
+    if (room && room.has(socketId)) {
+      return true; // They are online AND looking at this exact chat!
+    }
+
+    return false; // They are online, but looking at a different screen/chat
+  } catch (error) {
+    console.error('Error checking room activity:', error);
+    return false;
+  }
+};
+
 exports.editMessage = async (messageId, userId, content) => {
   const message = await Message.findById(messageId);
   if (!message) throw new AppError('Message not found.', 404);
@@ -194,13 +220,18 @@ exports.sendMessage = async (
     notificationText = `Shared a ${attachment.type} with you`;
   }
 
-  // Fire the notification! (We don't await this so it doesn't slow down the chat)
-  notificationService.notifyMessage(
-    receiverId,
-    senderId,
-    newMessage._id,
-    notificationText
-  );
+  const isUserBInChat = checkIfUserActiveInRoom(receiverId, conversation._id);
+
+  // CORRECTED: Added the closing bracket for this if statement
+  if (!isUserBInChat) {
+    // Only fire push notification if they are NOT looking at the chat
+    notificationService.notifyMessage(
+      receiverId,
+      senderId,
+      newMessage._id,
+      notificationText
+    );
+  } //
 
   return newMessage;
 };
@@ -220,7 +251,7 @@ exports.markMessagesAsRead = async (conversationId, userId) => {
     {
       conversationId: conversationId,
       senderId: { $ne: userId }, // We only mark messages sent TO us as read
-      status: 'delivered',
+      status: { $ne: 'read' },
     },
     {
       $set: { status: 'read' },

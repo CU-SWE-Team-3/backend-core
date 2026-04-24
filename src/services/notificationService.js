@@ -1,7 +1,5 @@
 // src/services/notificationService.js
-
 const Notification = require('../models/notificationModel');
-const User = require('../models/userModel');
 const { getIo } = require('../sockets/socketSetup');
 
 /**
@@ -10,19 +8,17 @@ const { getIo } = require('../sockets/socketSetup');
 const emitRealTimeNotification = (recipientId, notificationDoc) => {
   try {
     const io = getIo();
-    // Use your exact room naming convention: 'user_ID'
     io.to(`user_${recipientId.toString()}`).emit(
       'new_notification',
       notificationDoc
     );
   } catch (error) {
-    // If socket isn't initialized yet or user is offline, just skip gracefully
+    // Socket not initialized or user offline, gracefully skip
   }
 };
 
 /**
  * Core function to process, group, and create notifications
- * while respecting user preferences.
  */
 const processNotification = async ({
   recipientId,
@@ -31,29 +27,12 @@ const processNotification = async ({
   targetId,
   targetModel,
   contentSnippet = null,
-  preferenceKey = null, // The specific setting to check in the user's preferences
 }) => {
-  // 1. Prevent self-notification
-  if (recipientId.toString() === actorId.toString()) {
-    return null;
-  }
+  // Prevent self-notification (e.g., liking your own track)
+  if (recipientId.toString() === actorId.toString()) return null;
 
   try {
-    // 2. CHECK USER PREFERENCES
-    if (preferenceKey) {
-      const recipient = await User.findById(recipientId).select(
-        'notificationPreferences'
-      );
-      if (
-        recipient &&
-        recipient.notificationPreferences &&
-        recipient.notificationPreferences[preferenceKey] === false
-      ) {
-        return null; // Abort: The user has turned off this type of notification!
-      }
-    }
-
-    // 3. Find if there's an existing unread notification to group with
+    // 1. FIND & GROUP EXISTING NOTIFICATIONS
     let notification = await Notification.findOne({
       recipient: recipientId,
       target: targetId,
@@ -61,7 +40,6 @@ const processNotification = async ({
       isRead: false,
     });
 
-    // 4. Grouping Logic
     if (notification) {
       const actorAlreadyIncluded = notification.actors.some(
         (existingActorId) => existingActorId.toString() === actorId.toString()
@@ -70,16 +48,12 @@ const processNotification = async ({
       if (!actorAlreadyIncluded) {
         notification.actorCount += 1;
         notification.actors.unshift(actorId);
-
-        // Keep a maximum of 3 avatars to display (e.g., "User A, User B, and 5 others")
-        if (notification.actors.length > 3) {
-          notification.actors.pop();
-        }
-
+        // Keep max 3 actors for the preview UI (e.g., "User A, User B, and 2 others")
+        if (notification.actors.length > 3) notification.actors.pop();
         await notification.save();
       }
     } else {
-      // 5. Create New Notification
+      // 2. CREATE NEW NOTIFICATION
       notification = await Notification.create({
         recipient: recipientId,
         actors: [actorId],
@@ -91,53 +65,163 @@ const processNotification = async ({
       });
     }
 
-    // 6. Populate data for the frontend
+    // 3. POPULATE DATA FOR FRONTEND
     const populatedNotification = await Notification.findById(notification._id)
       .populate('actors', 'displayName avatarUrl')
       .populate('target', 'title permalink');
 
-    // 7. Emit via WebSockets
+    // 4. EMIT VIA WEBSOCKETS
     emitRealTimeNotification(recipientId, populatedNotification);
 
     return populatedNotification;
   } catch (error) {
-    const err = new Error(`Failed to process ${type} notification.`);
-    err.statusCode = 500;
-    err.originalError = error;
-
-    // eslint-disable-next-line no-console
-    console.error('[Notification Service Error]', err);
+    console.error('[Notification Service Error]', error);
     return null;
   }
 };
 
 // ==========================================
-// STANDARD TRIGGERS (Using processNotification)
+// DATA FETCHING LOGIC
 // ==========================================
 
-exports.notifyLike = async (trackOwnerId, likerId, targetId, targetModel) =>
+exports.getUserNotifications = async (userId, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+
+  const notifications = await Notification.find({ recipient: userId })
+    .sort('-updatedAt')
+    .skip(skip)
+    .limit(limit)
+    .populate('actors', 'displayName avatarUrl permalink')
+    .populate('target', 'title permalink');
+
+  const total = await Notification.countDocuments({ recipient: userId });
+
+  return {
+    notifications,
+    pagination: {
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+exports.getUnreadCount = async (userId) =>
+  await Notification.countDocuments({
+    recipient: userId,
+    isRead: false,
+  });
+
+// ==========================================
+// STATE MANAGEMENT & SOCKET SYNC
+// ==========================================
+
+exports.markAllAsRead = async (userId) => {
+  const result = await Notification.updateMany(
+    { recipient: userId, isRead: false },
+    { $set: { isRead: true } }
+  );
+
+  // Sync across all user's devices
+  try {
+    const io = getIo();
+    io.to(`user_${userId.toString()}`).emit('all_notifications_read');
+  } catch (err) {
+    console.warn(
+      `[Socket Warning] Could not emit 'all_notifications_read': ${err.message}`
+    );
+  }
+
+  return result.modifiedCount;
+};
+
+exports.markOneAsRead = async (userId, notificationId) => {
+  // 1. Find the notification first
+  const notification = await Notification.findOne({
+    _id: notificationId,
+    recipient: userId,
+  });
+
+  // 2. If it doesn't exist, return null so the controller can throw a 404
+  if (!notification) return null;
+
+  // 3. If it is ALREADY read, just return it. Do NOT save to DB or emit socket.
+  if (notification.isRead) {
+    return notification;
+  }
+
+  // 4. If it was unread, update it and save
+  notification.isRead = true;
+  await notification.save();
+
+  // 5. Emit the socket event ONLY because the state actually changed
+  try {
+    const io = getIo();
+    io.to(`user_${userId.toString()}`).emit('notification_read', {
+      notificationId: notification._id,
+    });
+  } catch (err) {
+    console.warn(
+      `[Socket Warning] Could not emit 'notification_read': ${err.message}`
+    );
+  }
+
+  return notification;
+};
+
+exports.deleteNotification = async (userId, notificationId) => {
+  const notification = await Notification.findOneAndDelete({
+    _id: notificationId,
+    recipient: userId,
+  });
+
+  if (notification) {
+    try {
+      const io = getIo();
+      io.to(`user_${userId.toString()}`).emit('notification_deleted', {
+        notificationId: notification._id,
+      });
+    } catch (err) {
+      console.warn(
+        `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
+      );
+    }
+  }
+
+  return notification;
+};
+
+// ==========================================
+// STANDARD TRIGGERS
+// ==========================================
+
+// Defaults to 'Track' just to be safe, but the other dev is passing it dynamically now
+exports.notifyLike = async (
+  ownerId,
+  likerId,
+  targetId,
+  targetModel = 'Track'
+) =>
   processNotification({
-    recipientId: trackOwnerId,
+    recipientId: ownerId,
     actorId: likerId,
     type: 'LIKE',
-    targetId: targetId,
-    targetModel: targetModel, // Or 'Playlist' dynamically if needed
-    preferenceKey: 'likes',
+    targetId,
+    targetModel,
   });
 
 exports.notifyRepost = async (
-  trackOwnerId,
+  ownerId,
   reposterId,
   targetId,
-  targetModel
+  targetModel = 'Track'
 ) =>
   processNotification({
-    recipientId: trackOwnerId,
+    recipientId: ownerId,
     actorId: reposterId,
     type: 'REPOST',
-    targetId: targetId,
-    targetModel: targetModel,
-    preferenceKey: 'reposts',
+    targetId,
+    targetModel,
   });
 
 exports.notifyFollow = async (followedUserId, followerId) =>
@@ -147,7 +231,6 @@ exports.notifyFollow = async (followedUserId, followerId) =>
     type: 'FOLLOW',
     targetId: followerId,
     targetModel: 'User',
-    preferenceKey: 'newFollowers',
   });
 
 exports.notifyComment = async (
@@ -169,7 +252,6 @@ exports.notifyComment = async (
     targetId: trackId,
     targetModel: 'Track',
     contentSnippet: snippet,
-    preferenceKey: 'comments',
   });
 };
 
@@ -180,7 +262,6 @@ exports.notifyNewTrack = async (followerId, artistId, trackId) =>
     type: 'NEW_TRACK',
     targetId: trackId,
     targetModel: 'Track',
-    preferenceKey: 'newTracks',
   });
 
 exports.notifyMessage = async (
@@ -202,32 +283,16 @@ exports.notifyMessage = async (
     targetId: messageId,
     targetModel: 'Message',
     contentSnippet: snippet,
-    preferenceKey: 'messages',
   });
 };
 
 // ==========================================
-// UNIQUE TRIGGERS (Custom logic)
+// UNIQUE TRIGGERS
 // ==========================================
 
-/**
- * Notifies a user that someone they follow created a new playlist
- */
 exports.notifyNewPlaylist = async (recipientId, actorId, playlistId) => {
   try {
     if (recipientId.toString() === actorId.toString()) return;
-
-    // Preference Check (Grouped with newTracks)
-    const recipient = await User.findById(recipientId).select(
-      'notificationPreferences'
-    );
-    if (
-      recipient &&
-      recipient.notificationPreferences &&
-      recipient.notificationPreferences.newTracks === false
-    ) {
-      return;
-    }
 
     const notification = await Notification.create({
       recipient: recipientId,
@@ -241,7 +306,6 @@ exports.notifyNewPlaylist = async (recipientId, actorId, playlistId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error(
       '[Notification Service] Failed to create NEW_PLAYLIST notification:',
       error
@@ -249,24 +313,9 @@ exports.notifyNewPlaylist = async (recipientId, actorId, playlistId) => {
   }
 };
 
-/**
- * Notifies a user when they are mentioned (@username) in a comment
- */
 exports.notifyMention = async (recipientId, actorId, trackId) => {
   try {
     if (recipientId.toString() === actorId.toString()) return;
-
-    // Preference Check
-    const recipient = await User.findById(recipientId).select(
-      'notificationPreferences'
-    );
-    if (
-      recipient &&
-      recipient.notificationPreferences &&
-      recipient.notificationPreferences.mentions === false
-    ) {
-      return;
-    }
 
     const notification = await Notification.create({
       recipient: recipientId,
@@ -280,23 +329,15 @@ exports.notifyMention = async (recipientId, actorId, trackId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error(
       '[Notification Service] Failed to create MENTION notification:',
       error
     );
   }
 };
-/**
- * Sends a system-wide broadcast or algorithmic recommendation to a specific user.
- * Example usage: notifySystem(userId, "SoundCloud Weekly: New tracks for you!");
- */
-/**
- * Sends a system-wide broadcast or algorithmic recommendation to a specific user.
- */
+
 exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
   try {
-    // Build the base notification object
     const notificationPayload = {
       recipient: recipientId,
       type: 'SYSTEM',
@@ -304,39 +345,24 @@ exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
       actorCount: 0,
       contentSnippet: messageText,
       isRead: false,
+      ...(actionLink && { actionLink }),
     };
-
-    // Use the actionLink if it was provided!
-    if (actionLink) {
-      notificationPayload.actionLink = actionLink;
-    }
 
     const notification = await Notification.create(notificationPayload);
 
-    try {
-      const io = getIo();
-      io.to(`user_${recipientId.toString()}`).emit(
-        'new_notification',
-        notification
-      );
-    } catch (socketError) {
-      // User is offline
-    }
+    emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error(
       '[Notification Service] Failed to create SYSTEM notification:',
       error
     );
   }
 };
+
 // ==========================================
-// UNDO LOGIC (Data Cleanup)
+// UNDO LOGIC
 // ==========================================
 
-/**
- * Removes notifications when an action is undone (e.g. Unliked, Unfollowed)
- */
 exports.retractNotification = async (recipientId, actorId, type, targetId) => {
   try {
     const notification = await Notification.findOne({
@@ -346,21 +372,29 @@ exports.retractNotification = async (recipientId, actorId, type, targetId) => {
     });
 
     if (notification) {
-      // Remove the actor who undid their action
       notification.actors = notification.actors.filter(
         (id) => id.toString() !== actorId.toString()
       );
       notification.actorCount = Math.max(0, notification.actorCount - 1);
 
-      // If no one else is in this notification, delete it entirely
       if (notification.actorCount === 0) {
         await Notification.findByIdAndDelete(notification._id);
+
+        try {
+          const io = getIo();
+          io.to(`user_${recipientId.toString()}`).emit('notification_deleted', {
+            notificationId: notification._id,
+          });
+        } catch (err) {
+          console.warn(
+            `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
+          );
+        }
       } else {
         await notification.save();
       }
     }
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error(
       `[Notification Service] Failed to retract ${type} notification:`,
       error
