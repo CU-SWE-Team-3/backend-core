@@ -107,6 +107,11 @@ const playlistSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    viralScore: {
+      type: Number,
+      default: 0,
+      index: true, // 👈 VERY IMPORTANT for speed!
+    },
   },
   {
     timestamps: true,
@@ -130,6 +135,10 @@ playlistSchema.methods.toJSON = function () {
   }
   return playlist;
 };
+playlistSchema.index(
+  { title: 'text', tags: 'text' },
+  { weights: { title: 5, tags: 2 }, name: 'PlaylistTextIndex' }
+);
 
 const Playlist = mongoose.model('Playlist', playlistSchema);
 

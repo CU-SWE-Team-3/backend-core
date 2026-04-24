@@ -14,6 +14,7 @@ const historyRouter = require('./routes/historyRoutes');
 
 const trackRoutes = require('./routes/trackRoutes');
 const authRoutes = require('./routes/authRoutes');
+const discoveryRoutes = require('./routes/discoveryRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const playerRoutes = require('./routes/playerRoutes');
 const playlistRoutes = require('./routes/playlistRoutes');
@@ -128,6 +129,7 @@ app.use('/api/tracks', trackRoutes);
 app.use('/api/player', playerRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/discovery', discoveryRoutes);
 
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);

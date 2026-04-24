@@ -4,6 +4,7 @@ const interactionController = require('../controllers/interactionController');
 const { protect, optionalAuth } = require('../middlewares/authMiddleware');
 const uploadMiddleware = require('../middlewares/uploadMiddleware');
 const commentController = require('../controllers/commentController');
+const searchController = require('../controllers/searchController');
 const { validate } = require('../middlewares/validationMiddleware');
 const {
   initiateUploadSchema,
@@ -56,6 +57,10 @@ router.patch(
   trackController.confirmUpload
 );
 router.get('/my-tracks', protect, trackController.getMyTracks);
+
+// ── Search & Discovery (Module 8) ──────────────────────────────────────────────
+router.get('/autocomplete', searchController.autocomplete);
+router.get('/search', optionalAuth, searchController.globalSearch);
 
 // ── Fetch & Stream ─────────────────────────────────────────────────────────────
 router.get(

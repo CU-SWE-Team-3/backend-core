@@ -36,26 +36,44 @@ const startCronJobs = () => {
     try {
       const now = new Date();
       const expiredUsers = await User.updateMany(
-        { 
-          isPremium: true, 
-          cancelAtPeriodEnd: true, 
-          subscriptionExpiresAt: { $lte: now } 
+        {
+          isPremium: true,
+          cancelAtPeriodEnd: true,
+          subscriptionExpiresAt: { $lte: now },
         },
-        { 
-          $set: { 
-            isPremium: false, 
+        {
+          $set: {
+            isPremium: false,
             subscriptionPlan: 'Free',
             mockStripeId: null,
             subscriptionExpiresAt: null,
-            cancelAtPeriodEnd: false
-          } 
+            cancelAtPeriodEnd: false,
+          },
         }
       );
       if (expiredUsers.modifiedCount > 0) {
-        console.log(`[Cron] Demoted ${expiredUsers.modifiedCount} expired premium subscriptions.`);
+        console.log(
+          `[Cron] Demoted ${expiredUsers.modifiedCount} expired premium subscriptions.`
+        );
       }
     } catch (error) {
-      console.error('[Cron Error] Failed to process subscription expirations:', error);
+      console.error(
+        '[Cron Error] Failed to process subscription expirations:',
+        error
+      );
+    }
+  });
+  cron.schedule('0 * * * *', async () => {
+    console.log('📉 Applying Gravity to Viral Scores...');
+
+    try {
+      // Multiply every track's viral score by 0.95 (A 5% decay every hour)
+      await Track.updateMany(
+        { viralScore: { $gt: 0.1 } }, // Only update tracks that have a score
+        { $mul: { viralScore: 0.95 } }
+      );
+    } catch (error) {
+      console.error('Gravity Job Failed:', error);
     }
   });
 };
