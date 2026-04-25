@@ -5,6 +5,7 @@ const ListenHistory = require('../models/listenHistoryModel');
 const Report = require('../models/reportModel');
 const notificationService = require('./notificationService');
 const subscriptionService = require('./subscriptionService');
+const sendEmail = require('../utils/sendEmail'); // <--- Add this import
 const AppError = require('../utils/appError');
 
 // ============================================================================
@@ -178,10 +179,23 @@ exports.sendUserWarning = async (userId, message) => {
   const user = await User.findById(userId);
   if (!user) throw new AppError('User not found', 404);
 
+  // 1. In-app Notification
   await notificationService.notifySystem(
     user._id,
     `OFFICIAL WARNING: ${message}`
   );
+
+  // 2. Email Notification
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Official Warning from BioBeats Moderation',
+      message: `Hi ${user.displayName || 'User'},\n\nThis is an official warning from the BioBeats Moderation Team.\n\nReason: ${message}\n\nPlease adhere to our community guidelines to avoid account suspension.\n\nRegards,\nThe BioBeats Team`,
+    });
+  } catch (error) {
+    console.error('[Email Error] Failed to send warning email:', error);
+  }
+
   return user;
 };
 
@@ -212,6 +226,18 @@ exports.suspendAccount = async (adminId, userIdToSuspend) => {
 
   user.accountStatus = 'Suspended';
   await user.save();
+
+  // Email Notification
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Notice: Your BioBeats Account has been Suspended',
+      message: `Hi ${user.displayName || 'User'},\n\nYour account has been suspended due to violations of our Terms of Service. You will no longer be able to log in or interact with the platform.\n\nIf you believe this is a mistake, you can reply to this email to appeal the decision.\n\nRegards,\nThe BioBeats Team`,
+    });
+  } catch (error) {
+    console.error('[Email Error] Failed to send suspension email:', error);
+  }
+
   return user;
 };
 
@@ -225,11 +251,24 @@ exports.restoreAccount = async (userId) => {
 
   user.accountStatus = 'Active';
   await user.save();
+
+  // Email Notification
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Update: Your BioBeats Account has been Restored',
+      message: `Hi ${user.displayName || 'User'},\n\nGood news! Your account has been reviewed and restored by our moderation team. You can now log back into BioBeats.\n\nWelcome back!\n\nRegards,\nThe BioBeats Team`,
+    });
+  } catch (error) {
+    console.error('[Email Error] Failed to send restore email:', error);
+  }
+
   return user;
 };
 
 exports.hideTrack = async (trackId) => {
-  const track = await Track.findById(trackId);
+  // CRITICAL: We must populate the artist to get their email address!
+  const track = await Track.findById(trackId).populate('artist');
   if (!track) throw new AppError('Track not found', 404);
 
   if (track.moderationStatus === 'Hidden_By_Admin') {
@@ -238,11 +277,26 @@ exports.hideTrack = async (trackId) => {
 
   track.moderationStatus = 'Hidden_By_Admin';
   await track.save();
+
+  // Email Notification
+  if (track.artist && track.artist.email) {
+    try {
+      await sendEmail({
+        email: track.artist.email,
+        subject: 'Notice: Your Track has been Removed',
+        message: `Hi ${track.artist.displayName || 'Artist'},\n\nYour track "${track.title}" has been removed from public visibility by our moderation team for violating our content policies (e.g., Copyright or Inappropriate Content).\n\nIf you believe this is a mistake, please reply to this email.\n\nRegards,\nThe BioBeats Team`,
+      });
+    } catch (error) {
+      console.error('[Email Error] Failed to send track hidden email:', error);
+    }
+  }
+
   return track;
 };
 
 exports.restoreTrack = async (trackId) => {
-  const track = await Track.findById(trackId);
+  // CRITICAL: We must populate the artist to get their email address!
+  const track = await Track.findById(trackId).populate('artist');
   if (!track) throw new AppError('Track not found', 404);
 
   if (track.moderationStatus === 'Approved') {
@@ -251,6 +305,20 @@ exports.restoreTrack = async (trackId) => {
 
   track.moderationStatus = 'Approved';
   await track.save();
+
+  // Email Notification
+  if (track.artist && track.artist.email) {
+    try {
+      await sendEmail({
+        email: track.artist.email,
+        subject: 'Update: Your Track has been Restored',
+        message: `Hi ${track.artist.displayName || 'Artist'},\n\nGood news! Your track "${track.title}" has been reviewed and successfully restored to the public feed.\n\nKeep creating!\n\nRegards,\nThe BioBeats Team`,
+      });
+    } catch (error) {
+      console.error('[Email Error] Failed to send track restore email:', error);
+    }
+  }
+
   return track;
 };
 
