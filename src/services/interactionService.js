@@ -196,10 +196,12 @@ exports.getUserReposts = async (userId, page = 1, limit = 20) => {
         {
           path: 'artist', // This will fire for Tracks
           select: 'displayName permalink avatarUrl role isPremium',
+          strictPopulate: false,
         },
         {
           path: 'creator', // This will fire for Playlists
           select: 'displayName permalink avatarUrl role isPremium',
+          strictPopulate: false,
         },
       ],
     });
@@ -263,10 +265,12 @@ exports.getUserLikes = async (userId, page = 1, limit = 20) => {
         {
           path: 'artist', // This will fire for Tracks
           select: 'displayName permalink avatarUrl role isPremium',
+          strictPopulate: false,
         },
         {
           path: 'creator', // This will fire for Playlists
           select: 'displayName permalink avatarUrl role isPremium',
+          strictPopulate: false,
         },
       ],
     });
