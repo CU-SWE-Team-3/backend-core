@@ -42,13 +42,13 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    
+
     // DEVELOPER D: Updated Notification Settings & FCM Tokens
     fcmTokens: [
       {
         type: String,
-        default: []
-      }
+        default: [],
+      },
     ],
     notificationSettings: {
       pushEnabled: { type: Boolean, default: true }, // Global kill switch
@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema(
       allowComments: { type: Boolean, default: true },
       allowFollows: { type: Boolean, default: true },
       allowMessages: { type: Boolean, default: true },
-      allowNewTracks: { type: Boolean, default: true }
+      allowNewTracks: { type: Boolean, default: true },
     },
 
     password: {
@@ -137,7 +137,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'default-cover.png',
     },
-    
+
     // payment details
     stripeCustomerId: { type: String },
     stripeSubscriptionId: { type: String },

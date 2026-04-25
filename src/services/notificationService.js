@@ -3,6 +3,7 @@ const Notification = require('../models/notificationModel');
 const { getIo } = require('../sockets/socketSetup');
 const User = require('../models/userModel'); // DEVELOPER D
 const firebaseService = require('./firebaseService'); // DEVELOPER D
+const AppError = require('../utils/appError');
 
 /**
  * Helper to emit events via Socket.IO.
@@ -78,16 +79,22 @@ const processNotification = async ({
     // ==========================================
     // 5. DEVELOPER D: PUSH NOTIFICATION & FILTERING
     // ==========================================
-    const recipient = await User.findById(recipientId).select('fcmTokens notificationSettings');
-    
+    const recipient = await User.findById(recipientId).select(
+      'fcmTokens notificationSettings'
+    );
+
     // If no user, or global push is disabled, or no devices are registered -> Abort Push
-    if (!recipient || !recipient.notificationSettings?.pushEnabled || !recipient.fcmTokens?.length) {
+    if (
+      !recipient ||
+      !recipient.notificationSettings?.pushEnabled ||
+      !recipient.fcmTokens?.length
+    ) {
       return populatedNotification;
     }
 
     const settings = recipient.notificationSettings;
     const actorName = populatedNotification.actors[0]?.displayName || 'Someone';
-    
+
     let pushTitle = '';
     let pushBody = '';
     let shouldPush = false;
@@ -137,7 +144,7 @@ const processNotification = async ({
         break;
       case 'MENTION':
       case 'SYSTEM':
-        shouldPush = true; 
+        shouldPush = true;
         pushTitle = type === 'SYSTEM' ? 'BioBeats Alert' : 'You were mentioned';
         pushBody = contentSnippet || `You have a new ${type.toLowerCase()}`;
         break;
@@ -145,13 +152,13 @@ const processNotification = async ({
 
     if (shouldPush) {
       await firebaseService.sendPushNotification(
-        recipient.fcmTokens, 
-        pushTitle, 
-        pushBody, 
+        recipient.fcmTokens,
+        pushTitle,
+        pushBody,
         {
           notificationId: populatedNotification._id.toString(),
           type: type,
-          targetId: targetId ? targetId.toString() : ''
+          targetId: targetId ? targetId.toString() : '',
         }
       );
     }
@@ -209,7 +216,9 @@ exports.markAllAsRead = async (userId) => {
     const io = getIo();
     io.to(`user_${userId.toString()}`).emit('all_notifications_read');
   } catch (err) {
-    console.warn(`[Socket Warning] Could not emit 'all_notifications_read': ${err.message}`);
+    console.warn(
+      `[Socket Warning] Could not emit 'all_notifications_read': ${err.message}`
+    );
   }
 
   return result.modifiedCount;
@@ -233,7 +242,9 @@ exports.markOneAsRead = async (userId, notificationId) => {
       notificationId: notification._id,
     });
   } catch (err) {
-    console.warn(`[Socket Warning] Could not emit 'notification_read': ${err.message}`);
+    console.warn(
+      `[Socket Warning] Could not emit 'notification_read': ${err.message}`
+    );
   }
 
   return notification;
@@ -252,7 +263,9 @@ exports.deleteNotification = async (userId, notificationId) => {
         notificationId: notification._id,
       });
     } catch (err) {
-      console.warn(`[Socket Warning] Could not emit 'notification_deleted': ${err.message}`);
+      console.warn(
+        `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
+      );
     }
   }
 
@@ -263,7 +276,12 @@ exports.deleteNotification = async (userId, notificationId) => {
 // STANDARD TRIGGERS
 // ==========================================
 
-exports.notifyLike = async (ownerId, likerId, targetId, targetModel = 'Track') =>
+exports.notifyLike = async (
+  ownerId,
+  likerId,
+  targetId,
+  targetModel = 'Track'
+) =>
   processNotification({
     recipientId: ownerId,
     actorId: likerId,
@@ -272,7 +290,12 @@ exports.notifyLike = async (ownerId, likerId, targetId, targetModel = 'Track') =
     targetModel,
   });
 
-exports.notifyRepost = async (ownerId, reposterId, targetId, targetModel = 'Track') =>
+exports.notifyRepost = async (
+  ownerId,
+  reposterId,
+  targetId,
+  targetModel = 'Track'
+) =>
   processNotification({
     recipientId: ownerId,
     actorId: reposterId,
@@ -290,9 +313,17 @@ exports.notifyFollow = async (followedUserId, followerId) =>
     targetModel: 'User',
   });
 
-exports.notifyComment = async (trackOwnerId, commenterId, trackId, commentText) => {
+exports.notifyComment = async (
+  trackOwnerId,
+  commenterId,
+  trackId,
+  commentText
+) => {
   const safeCommentText = commentText || '';
-  const snippet = safeCommentText.length > 50 ? `${safeCommentText.substring(0, 47)}...` : safeCommentText;
+  const snippet =
+    safeCommentText.length > 50
+      ? `${safeCommentText.substring(0, 47)}...`
+      : safeCommentText;
 
   return processNotification({
     recipientId: trackOwnerId,
@@ -313,9 +344,17 @@ exports.notifyNewTrack = async (followerId, artistId, trackId) =>
     targetModel: 'Track',
   });
 
-exports.notifyMessage = async (recipientId, senderId, messageId, messageText) => {
+exports.notifyMessage = async (
+  recipientId,
+  senderId,
+  messageId,
+  messageText
+) => {
   const safeMessageText = messageText || '';
-  const snippet = safeMessageText.length > 50 ? `${safeMessageText.substring(0, 47)}...` : safeMessageText;
+  const snippet =
+    safeMessageText.length > 50
+      ? `${safeMessageText.substring(0, 47)}...`
+      : safeMessageText;
 
   return processNotification({
     recipientId,
@@ -347,7 +386,10 @@ exports.notifyNewPlaylist = async (recipientId, actorId, playlistId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error('[Notification Service] Failed to create NEW_PLAYLIST notification:', error);
+    console.error(
+      '[Notification Service] Failed to create NEW_PLAYLIST notification:',
+      error
+    );
   }
 };
 
@@ -367,7 +409,10 @@ exports.notifyMention = async (recipientId, actorId, trackId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error('[Notification Service] Failed to create MENTION notification:', error);
+    console.error(
+      '[Notification Service] Failed to create MENTION notification:',
+      error
+    );
   }
 };
 
@@ -386,7 +431,10 @@ exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
     const notification = await Notification.create(notificationPayload);
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error('[Notification Service] Failed to create SYSTEM notification:', error);
+    console.error(
+      '[Notification Service] Failed to create SYSTEM notification:',
+      error
+    );
   }
 };
 
@@ -416,13 +464,56 @@ exports.retractNotification = async (recipientId, actorId, type, targetId) => {
             notificationId: notification._id,
           });
         } catch (err) {
-          console.warn(`[Socket Warning] Could not emit 'notification_deleted': ${err.message}`);
+          console.warn(
+            `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
+          );
         }
       } else {
         await notification.save();
       }
     }
   } catch (error) {
-    console.error(`[Notification Service] Failed to retract ${type} notification:`, error);
+    console.error(
+      `[Notification Service] Failed to retract ${type} notification:`,
+      error
+    );
   }
+};
+
+exports.addFcmToken = async (userId, token) => {
+  await User.findByIdAndUpdate(userId, {
+    $addToSet: { fcmTokens: token },
+  });
+};
+
+exports.removeFcmToken = async (userId, token) => {
+  await User.findByIdAndUpdate(userId, {
+    $pull: { fcmTokens: token },
+  });
+};
+
+exports.updatePreferences = async (userId, preferences) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError('User not found', 404);
+
+  // List of allowed fields so users can't inject random data into your DB
+  const allowedFields = [
+    'pushEnabled',
+    'allowLikes',
+    'allowReposts',
+    'allowComments',
+    'allowFollows',
+    'allowMessages',
+    'allowNewTracks',
+  ];
+
+  // Loop through allowed fields and update if provided
+  allowedFields.forEach((field) => {
+    if (preferences[field] !== undefined) {
+      user.notificationSettings[field] = preferences[field];
+    }
+  });
+
+  await user.save({ validateModifiedOnly: true });
+  return user.notificationSettings;
 };
