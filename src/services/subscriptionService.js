@@ -49,6 +49,12 @@ exports.cancelSubscription = async (userId) => {
 
   // They retain premium access until the billing cycle ends
   user.cancelAtPeriodEnd = true;
+  // Tell Stripe to cancel the subscription at the end of the current billing month
+  if (user.stripeSubscriptionId) {
+    await stripe.subscriptions.update(user.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+  }
   await user.save();
 
   return {
@@ -101,4 +107,34 @@ exports.handleWebhook = async (rawBody, signature) => {
       `✅ [Stripe] Successfully upgraded User ${userId} to ${planType}`
     );
   }
+};
+
+// Add this at the bottom of subscriptionService.js
+
+exports.getRevenueStats = async () => {
+  // Define your plan prices
+  const PRO_PRICE = 5;
+  const GOPLUS_PRICE = 10;
+
+  // Count active subscriptions directly from the User model
+  const proUsersCount = await User.countDocuments({
+    subscriptionPlan: 'Pro',
+    isPremium: true,
+  });
+  const goPlusUsersCount = await User.countDocuments({
+    subscriptionPlan: 'Go+',
+    isPremium: true,
+  });
+
+  const creatorRevenue = proUsersCount * PRO_PRICE;
+  const listenerRevenue = goPlusUsersCount * GOPLUS_PRICE;
+
+  return {
+    activeSubscriptions: proUsersCount + goPlusUsersCount,
+    totalRevenue: creatorRevenue + listenerRevenue,
+    proUsersCount,
+    goPlusUsersCount,
+    creatorRevenue,
+    listenerRevenue,
+  };
 };
