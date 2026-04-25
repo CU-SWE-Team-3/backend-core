@@ -78,7 +78,7 @@ const processNotification = async ({
     // ==========================================
     // 5. DEVELOPER D: PUSH NOTIFICATION & FILTERING
     // ==========================================
-    const recipient = await User.findById(recipientId).select('+fcmTokens notificationSettings');
+    const recipient = await User.findById(recipientId).select('fcmTokens notificationSettings');
     
     // If no user, or global push is disabled, or no devices are registered -> Abort Push
     if (!recipient || !recipient.notificationSettings?.pushEnabled || !recipient.fcmTokens?.length) {

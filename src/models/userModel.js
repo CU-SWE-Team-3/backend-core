@@ -47,6 +47,7 @@ const userSchema = new mongoose.Schema(
     fcmTokens: [
       {
         type: String,
+        default: []
       }
     ],
     notificationSettings: {
