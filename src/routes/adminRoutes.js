@@ -66,4 +66,22 @@ router.patch(
 );
 router.post('/broadcast', protect, adminController.broadcastToAllUsers);
 
+// --- APPEND TO BOTTOM OF FILE ---
+
+// Content Management Endpoints
+router.get('/tracks', adminController.getAdminTracks);
+router.get('/users', adminController.getAdminUsers);
+
+// Health & Stats Endpoints
+router.get('/stats/daily-users', adminController.getDailyActiveUsers);
+router.get('/stats/top-tracks', adminController.getTopTracks);
+
+// User Warning Endpoint
+// Uses your existing idParamSchema from adminValidation.js
+router.post(
+  '/users/:id/warn',
+  validate(adminValidation.idParamSchema),
+  adminController.warnUser
+);
+
 module.exports = router;

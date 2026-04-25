@@ -35,10 +35,7 @@ exports.hideTrackContent = catchAsync(async (req, res, next) => {
 });
 
 exports.submitReport = catchAsync(async (req, res, next) => {
-  // Just pass data to the service
   const newReport = await adminService.createReport(req.body, req.user._id);
-
-  // Just send the response
   res.status(201).json({
     success: true,
     message: 'Report submitted successfully',
@@ -59,7 +56,7 @@ exports.getReports = catchAsync(async (req, res, next) => {
 
 exports.resolveReport = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  const { status } = req.body; // Expects "Reviewed" or "Resolved"
+  const { status } = req.body;
   const report = await adminService.updateReportStatus(id, status);
   res.status(200).json({
     success: true,
@@ -89,6 +86,8 @@ exports.restoreTrackContent = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+// --- REFACTORED: Logic moved to Service ---
 exports.broadcastToAllUsers = catchAsync(async (req, res, next) => {
   const { message, actionLink } = req.body;
 
@@ -96,20 +95,51 @@ exports.broadcastToAllUsers = catchAsync(async (req, res, next) => {
     return next(new AppError('Broadcast message is required.', 400));
   }
 
-  // 1. Fetch ALL user IDs from the database
-  // We use .select('_id') to make the query extremely fast and lightweight
-  const users = await User.find({}).select('_id');
-
-  // 2. Loop through all users and trigger the system notification
-  // Promise.all ensures they are sent concurrently for maximum speed
-  const broadcastPromises = users.map((user) =>
-    notificationService.notifySystem(user._id, message, actionLink)
+  // Pass the data to the Service to handle the business logic
+  const usersCount = await adminService.broadcastMessageToAll(
+    message,
+    actionLink
   );
 
-  await Promise.all(broadcastPromises);
-
+  // Send the response
   res.status(200).json({
     success: true,
-    message: `System broadcast successfully sent to ${users.length} users.`,
+    message: `System broadcast successfully sent to ${usersCount} users.`,
+  });
+});
+
+// --- LISTS & DASHBOARD APIs ---
+exports.getAdminTracks = catchAsync(async (req, res, next) => {
+  const result = await adminService.getAllTracks(req.query);
+  res.status(200).json({ success: true, ...result });
+});
+
+exports.getAdminUsers = catchAsync(async (req, res, next) => {
+  const result = await adminService.getAllUsers(req.query);
+  res.status(200).json({ success: true, ...result });
+});
+
+exports.getDailyActiveUsers = catchAsync(async (req, res, next) => {
+  const stats = await adminService.getDailyActiveUsersSeries(req.query.days);
+  res.status(200).json({ success: true, data: stats });
+});
+
+exports.getTopTracks = catchAsync(async (req, res, next) => {
+  const tracks = await adminService.getTopTracksList(req.query.limit);
+  res.status(200).json({ success: true, data: tracks });
+});
+
+exports.warnUser = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { message } = req.body;
+
+  if (!message) {
+    return next(new AppError('A warning message is required', 400));
+  }
+
+  await adminService.sendUserWarning(id, message);
+  res.status(200).json({
+    success: true,
+    message: 'Official warning sent to user successfully',
   });
 });
