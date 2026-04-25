@@ -1,6 +1,8 @@
 // src/services/notificationService.js
 const Notification = require('../models/notificationModel');
 const { getIo } = require('../sockets/socketSetup');
+const User = require('../models/userModel'); // DEVELOPER D
+const firebaseService = require('./firebaseService'); // DEVELOPER D
 
 /**
  * Helper to emit events via Socket.IO.
@@ -48,7 +50,7 @@ const processNotification = async ({
       if (!actorAlreadyIncluded) {
         notification.actorCount += 1;
         notification.actors.unshift(actorId);
-        // Keep max 3 actors for the preview UI (e.g., "User A, User B, and 2 others")
+        // Keep max 3 actors for the preview UI
         if (notification.actors.length > 3) notification.actors.pop();
         await notification.save();
       }
@@ -72,6 +74,87 @@ const processNotification = async ({
 
     // 4. EMIT VIA WEBSOCKETS
     emitRealTimeNotification(recipientId, populatedNotification);
+
+    // ==========================================
+    // 5. DEVELOPER D: PUSH NOTIFICATION & FILTERING
+    // ==========================================
+    const recipient = await User.findById(recipientId).select('+fcmTokens notificationSettings');
+    
+    // If no user, or global push is disabled, or no devices are registered -> Abort Push
+    if (!recipient || !recipient.notificationSettings?.pushEnabled || !recipient.fcmTokens?.length) {
+      return populatedNotification;
+    }
+
+    const settings = recipient.notificationSettings;
+    const actorName = populatedNotification.actors[0]?.displayName || 'Someone';
+    
+    let pushTitle = '';
+    let pushBody = '';
+    let shouldPush = false;
+
+    switch (type) {
+      case 'LIKE':
+        if (settings.allowLikes) {
+          shouldPush = true;
+          pushTitle = 'New Like';
+          pushBody = `${actorName} liked your ${targetModel.toLowerCase()}`;
+        }
+        break;
+      case 'REPOST':
+        if (settings.allowReposts) {
+          shouldPush = true;
+          pushTitle = 'New Repost';
+          pushBody = `${actorName} reposted your ${targetModel.toLowerCase()}`;
+        }
+        break;
+      case 'COMMENT':
+        if (settings.allowComments) {
+          shouldPush = true;
+          pushTitle = 'New Comment';
+          pushBody = `${actorName} commented: "${contentSnippet}"`;
+        }
+        break;
+      case 'FOLLOW':
+        if (settings.allowFollows) {
+          shouldPush = true;
+          pushTitle = 'New Follower';
+          pushBody = `${actorName} started following you`;
+        }
+        break;
+      case 'MESSAGE':
+        if (settings.allowMessages) {
+          shouldPush = true;
+          pushTitle = `Message from ${actorName}`;
+          pushBody = contentSnippet;
+        }
+        break;
+      case 'NEW_TRACK':
+        if (settings.allowNewTracks) {
+          shouldPush = true;
+          pushTitle = 'New Track Alert';
+          pushBody = `${actorName} just uploaded a new track!`;
+        }
+        break;
+      case 'MENTION':
+      case 'SYSTEM':
+        shouldPush = true; 
+        pushTitle = type === 'SYSTEM' ? 'BioBeats Alert' : 'You were mentioned';
+        pushBody = contentSnippet || `You have a new ${type.toLowerCase()}`;
+        break;
+    }
+
+    if (shouldPush) {
+      await firebaseService.sendPushNotification(
+        recipient.fcmTokens, 
+        pushTitle, 
+        pushBody, 
+        {
+          notificationId: populatedNotification._id.toString(),
+          type: type,
+          targetId: targetId ? targetId.toString() : ''
+        }
+      );
+    }
 
     return populatedNotification;
   } catch (error) {
@@ -122,48 +205,35 @@ exports.markAllAsRead = async (userId) => {
     { $set: { isRead: true } }
   );
 
-  // Sync across all user's devices
   try {
     const io = getIo();
     io.to(`user_${userId.toString()}`).emit('all_notifications_read');
   } catch (err) {
-    console.warn(
-      `[Socket Warning] Could not emit 'all_notifications_read': ${err.message}`
-    );
+    console.warn(`[Socket Warning] Could not emit 'all_notifications_read': ${err.message}`);
   }
 
   return result.modifiedCount;
 };
 
 exports.markOneAsRead = async (userId, notificationId) => {
-  // 1. Find the notification first
   const notification = await Notification.findOne({
     _id: notificationId,
     recipient: userId,
   });
 
-  // 2. If it doesn't exist, return null so the controller can throw a 404
   if (!notification) return null;
+  if (notification.isRead) return notification;
 
-  // 3. If it is ALREADY read, just return it. Do NOT save to DB or emit socket.
-  if (notification.isRead) {
-    return notification;
-  }
-
-  // 4. If it was unread, update it and save
   notification.isRead = true;
   await notification.save();
 
-  // 5. Emit the socket event ONLY because the state actually changed
   try {
     const io = getIo();
     io.to(`user_${userId.toString()}`).emit('notification_read', {
       notificationId: notification._id,
     });
   } catch (err) {
-    console.warn(
-      `[Socket Warning] Could not emit 'notification_read': ${err.message}`
-    );
+    console.warn(`[Socket Warning] Could not emit 'notification_read': ${err.message}`);
   }
 
   return notification;
@@ -182,9 +252,7 @@ exports.deleteNotification = async (userId, notificationId) => {
         notificationId: notification._id,
       });
     } catch (err) {
-      console.warn(
-        `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
-      );
+      console.warn(`[Socket Warning] Could not emit 'notification_deleted': ${err.message}`);
     }
   }
 
@@ -195,13 +263,7 @@ exports.deleteNotification = async (userId, notificationId) => {
 // STANDARD TRIGGERS
 // ==========================================
 
-// Defaults to 'Track' just to be safe, but the other dev is passing it dynamically now
-exports.notifyLike = async (
-  ownerId,
-  likerId,
-  targetId,
-  targetModel = 'Track'
-) =>
+exports.notifyLike = async (ownerId, likerId, targetId, targetModel = 'Track') =>
   processNotification({
     recipientId: ownerId,
     actorId: likerId,
@@ -210,12 +272,7 @@ exports.notifyLike = async (
     targetModel,
   });
 
-exports.notifyRepost = async (
-  ownerId,
-  reposterId,
-  targetId,
-  targetModel = 'Track'
-) =>
+exports.notifyRepost = async (ownerId, reposterId, targetId, targetModel = 'Track') =>
   processNotification({
     recipientId: ownerId,
     actorId: reposterId,
@@ -233,17 +290,9 @@ exports.notifyFollow = async (followedUserId, followerId) =>
     targetModel: 'User',
   });
 
-exports.notifyComment = async (
-  trackOwnerId,
-  commenterId,
-  trackId,
-  commentText
-) => {
+exports.notifyComment = async (trackOwnerId, commenterId, trackId, commentText) => {
   const safeCommentText = commentText || '';
-  const snippet =
-    safeCommentText.length > 50
-      ? `${safeCommentText.substring(0, 47)}...`
-      : safeCommentText;
+  const snippet = safeCommentText.length > 50 ? `${safeCommentText.substring(0, 47)}...` : safeCommentText;
 
   return processNotification({
     recipientId: trackOwnerId,
@@ -264,17 +313,9 @@ exports.notifyNewTrack = async (followerId, artistId, trackId) =>
     targetModel: 'Track',
   });
 
-exports.notifyMessage = async (
-  recipientId,
-  senderId,
-  messageId,
-  messageText
-) => {
+exports.notifyMessage = async (recipientId, senderId, messageId, messageText) => {
   const safeMessageText = messageText || '';
-  const snippet =
-    safeMessageText.length > 50
-      ? `${safeMessageText.substring(0, 47)}...`
-      : safeMessageText;
+  const snippet = safeMessageText.length > 50 ? `${safeMessageText.substring(0, 47)}...` : safeMessageText;
 
   return processNotification({
     recipientId,
@@ -306,10 +347,7 @@ exports.notifyNewPlaylist = async (recipientId, actorId, playlistId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error(
-      '[Notification Service] Failed to create NEW_PLAYLIST notification:',
-      error
-    );
+    console.error('[Notification Service] Failed to create NEW_PLAYLIST notification:', error);
   }
 };
 
@@ -329,10 +367,7 @@ exports.notifyMention = async (recipientId, actorId, trackId) => {
 
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error(
-      '[Notification Service] Failed to create MENTION notification:',
-      error
-    );
+    console.error('[Notification Service] Failed to create MENTION notification:', error);
   }
 };
 
@@ -349,13 +384,9 @@ exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
     };
 
     const notification = await Notification.create(notificationPayload);
-
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
-    console.error(
-      '[Notification Service] Failed to create SYSTEM notification:',
-      error
-    );
+    console.error('[Notification Service] Failed to create SYSTEM notification:', error);
   }
 };
 
@@ -379,25 +410,19 @@ exports.retractNotification = async (recipientId, actorId, type, targetId) => {
 
       if (notification.actorCount === 0) {
         await Notification.findByIdAndDelete(notification._id);
-
         try {
           const io = getIo();
           io.to(`user_${recipientId.toString()}`).emit('notification_deleted', {
             notificationId: notification._id,
           });
         } catch (err) {
-          console.warn(
-            `[Socket Warning] Could not emit 'notification_deleted': ${err.message}`
-          );
+          console.warn(`[Socket Warning] Could not emit 'notification_deleted': ${err.message}`);
         }
       } else {
         await notification.save();
       }
     }
   } catch (error) {
-    console.error(
-      `[Notification Service] Failed to retract ${type} notification:`,
-      error
-    );
+    console.error(`[Notification Service] Failed to retract ${type} notification:`, error);
   }
 };
