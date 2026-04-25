@@ -3,6 +3,7 @@ const profileController = require('../controllers/profileController');
 const upload = require('../middlewares/uploadMiddleware');
 const { protect } = require('../middlewares/authMiddleware');
 const interactionController = require('../controllers/interactionController');
+const trackController = require('../controllers/trackController');
 const { validate } = require('../middlewares/validationMiddleware');
 const {
   updateProfileSchema,
@@ -52,6 +53,7 @@ router.get(
   validate(userEngagementFeedSchema),
   interactionController.getUserLikesFeed
 );
+router.get('/:id/tracks', trackController.getUserTracks);
 
 router.get('/:permalink', profileController.getProfileByPermalink);
 router.patch(

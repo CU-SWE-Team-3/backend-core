@@ -5,13 +5,18 @@ const catchAsync = require('../utils/catchAsync');
 
 // ── Existing ──────────────────────────────────────────────────────────────────
 
-exports.getTrendingStation = catchAsync(async (req, res, next) => {
-  const trendingTracks = await discoveryService.getTrendingTracks();
+exports.getTrendingCharts = catchAsync(async (req, res, next) => {
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const { genre } = req.query;
+
+  const trendingTracks = await discoveryService.getTrendingTracks(limit, genre);
 
   res.status(200).json({
-    status: 'success',
+    success: true,
     results: trendingTracks.length,
-    data: { tracks: trendingTracks },
+    data: {
+      trending: trendingTracks,
+    },
   });
 });
 

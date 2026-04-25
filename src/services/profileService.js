@@ -32,7 +32,7 @@ exports.updatePrivacy = async (userId, isPrivate) => {
     { isPrivate },
     { new: true, runValidators: true }
   ).select('isPrivate');
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -89,7 +89,7 @@ exports.updateTier = async (userId, role) => {
     { role },
     { new: true, runValidators: true }
   ).select('role');
-  if (!user) throw new Error('User not found');
+  if (!user) throw new AppError('User not found', 404);
   return user;
 };
 
@@ -139,7 +139,7 @@ exports.updateProfileImages = async (userId, uploadedFiles) => {
   }
 
   if (Object.keys(updateFields).length === 0) {
-    throw new Error('No valid image fields provided');
+    throw new AppError('No valid image fields provided', 400);
   }
 
   return User.findByIdAndUpdate(

@@ -7,7 +7,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const router = express.Router();
 
 // ── Existing routes (unchanged) ───────────────────────────────────────────────
-router.get('/trending', discoveryController.getTrendingStation);
+router.get('/trending', discoveryController.getTrendingCharts);
 router.get('/recommended', protect, discoveryController.getStationBasedOnLikes);
 router.get('/genre/:genre', discoveryController.getStationByGenre);
 router.get('/artist/:artistId', discoveryController.getStationByArtist);

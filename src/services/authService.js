@@ -25,18 +25,38 @@ const generateTokens = async (user) => {
 
 const verifyRefreshToken = async (incomingRefreshToken) => {
   try {
+    // 1. Verify the token (this throws an error if expired or tampered with)
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.JWT_REFRESH_SECRET
     );
+
+    // 2. Find the user
     const user = await User.findById(decoded.id);
+
+    // 3. Check if user exists AND if the token matches the one in the DB
     if (!user || user.refreshToken !== incomingRefreshToken) {
-      throw new Error('Invalid or revoked refresh token');
+      throw new AppError(
+        'Invalid or revoked refresh token. Please log in again.',
+        401
+      );
     }
+
+    // 4. Generate new tokens
     const { token, refreshToken } = await generateTokens(user);
+
     return { token, refreshToken, user };
   } catch (error) {
-    throw new Error('Unauthorized');
+    // CRITICAL FIX: If the error is ALREADY an AppError (like the one we threw in step 3), re-throw it so we don't lose the status code!
+    if (error.isOperational) {
+      throw error;
+    }
+
+    // Otherwise, it was a JWT error (like TokenExpiredError), so we throw a 401 AppError
+    throw new AppError(
+      'Unauthorized: Token is invalid or expired. Please log in again.',
+      401
+    );
   }
 };
 

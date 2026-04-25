@@ -83,6 +83,24 @@ exports.updateMetadata = catchAsync(async (req, res) => {
   });
 });
 
+exports.getUserTracks = catchAsync(async (req, res, next) => {
+  // 1. Get the user ID from the URL (/api/profile/:id/tracks)
+  const userId = req.params.id;
+
+  // 2. Get pagination from query params (?page=1&limit=20)
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+
+  // 3. Fetch the data from the service
+  const result = await trackService.getUserTracks(userId, page, limit);
+
+  // 4. Send the response
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
 /**
  * @desc    Toggle track visibility (Public / Private)
  * @route   PATCH /api/tracks/:id/visibility

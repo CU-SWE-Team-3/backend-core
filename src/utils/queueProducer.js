@@ -66,9 +66,10 @@ exports.publishToQueue = async (queueName, data) => {
     await channelWrapper.sendToQueue(queueName, data, {
       persistent: true,
     });
+    const entityId = data.trackId || data.targetId || 'Unknown ID';
 
     console.log(
-      `🎫 [Producer] Ticket created in '${queueName}' for track: ${data.trackId}`
+      `🎫 [Producer] Ticket created in '${queueName}' for track: ${entityId}`
     );
   } catch (error) {
     console.error('❌ [Producer] Failed to publish message:', error);

@@ -107,7 +107,7 @@ exports.getStationByArtist = async (artistId) => {
 
 exports.getRelatedTracks = async (trackId) => {
   const track = await Track.findById(trackId);
-  if (!track) throw new Error('Track not found');
+  if (!track) throw new AppError('Track not found', 404);
 
   return await Track.find({
     _id: { $ne: trackId },

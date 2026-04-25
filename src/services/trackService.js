@@ -389,6 +389,43 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
   return trackObj;
 };
 
+exports.getUserTracks = async (userId, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+
+  // 1. Find tracks belonging to this specific user
+  const tracks = await Track.find({
+    artist: userId,
+    // Optional: Only return finished/released tracks so users don't see drafts
+    $or: [
+      { processingState: 'Finished' },
+      { processingState: { $exists: false } },
+    ],
+  })
+    .sort({ createdAt: -1 }) // Newest tracks first
+    .skip(skip)
+    .limit(limit)
+    .populate({
+      path: 'artist',
+      select: 'displayName permalink avatarUrl role isPremium isEmailVerified',
+    });
+
+  // 2. Count total tracks for frontend pagination
+  const total = await Track.countDocuments({
+    artist: userId,
+    $or: [
+      { processingState: 'Finished' },
+      { processingState: { $exists: false } },
+    ],
+  });
+
+  return {
+    total,
+    page: parseInt(page, 10),
+    totalPages: Math.ceil(total / limit),
+    tracks,
+  };
+};
+
 // 4. DOWNLOAD TRACK (Module 12: Premium Offline Listening)
 exports.downloadTrackAudio = async (trackId, user) => {
   // ONLY Go+ users get offline listening
