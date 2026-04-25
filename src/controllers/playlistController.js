@@ -1,10 +1,10 @@
 // src/controllers/playlistController.js
-const PlaylistService = require('../services/playlistService');
+const playlistService = require('../services/playlistService');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError'); // <-- Added to handle missing files
 
 exports.createPlaylist = catchAsync(async (req, res, next) => {
-  const playlist = await PlaylistService.createPlaylist(req.user._id, req.body);
+  const playlist = await playlistService.createPlaylist(req.user._id, req.body);
 
   res.status(201).json({
     status: 'success',
@@ -16,7 +16,7 @@ exports.getPlaylist = catchAsync(async (req, res, next) => {
   const user = req.user || null;
   const { secretToken } = req.query;
 
-  const playlist = await PlaylistService.getPlaylist(
+  const playlist = await playlistService.getPlaylist(
     req.params.id,
     user,
     secretToken
@@ -29,7 +29,7 @@ exports.getPlaylist = catchAsync(async (req, res, next) => {
 });
 
 exports.updatePlaylist = catchAsync(async (req, res, next) => {
-  const playlist = await PlaylistService.updatePlaylist(
+  const playlist = await playlistService.updatePlaylist(
     req.params.id,
     req.user._id,
     req.body
@@ -42,7 +42,7 @@ exports.updatePlaylist = catchAsync(async (req, res, next) => {
 });
 
 exports.deletePlaylist = catchAsync(async (req, res, next) => {
-  await PlaylistService.deletePlaylist(req.params.id, req.user._id);
+  await playlistService.deletePlaylist(req.params.id, req.user._id);
 
   res.status(204).json({
     status: 'success',
@@ -51,7 +51,7 @@ exports.deletePlaylist = catchAsync(async (req, res, next) => {
 });
 
 exports.updateTracks = catchAsync(async (req, res, next) => {
-  const playlist = await PlaylistService.updateTracks(
+  const playlist = await playlistService.updateTracks(
     req.params.id,
     req.user._id,
     req.body.tracks
@@ -64,7 +64,7 @@ exports.updateTracks = catchAsync(async (req, res, next) => {
 });
 
 exports.getEmbedCode = catchAsync(async (req, res, next) => {
-  const data = await PlaylistService.getEmbedCode(
+  const data = await playlistService.getEmbedCode(
     req.params.id,
     req.user,
     req.query.secretToken
@@ -78,7 +78,7 @@ exports.getEmbedCode = catchAsync(async (req, res, next) => {
 
 exports.getAllPlaylists = catchAsync(async (req, res, next) => {
   // Pass req.query for filtering and req.user for privacy checks
-  const playlists = await PlaylistService.getAllPlaylists(req.query, req.user);
+  const playlists = await playlistService.getAllPlaylists(req.query, req.user);
 
   res.status(200).json({
     status: 'success',
@@ -94,7 +94,7 @@ exports.uploadArtwork = catchAsync(async (req, res, next) => {
     return next(new AppError('Please provide an image file to upload.', 400));
   }
 
-  const playlist = await PlaylistService.uploadArtwork(
+  const playlist = await playlistService.uploadArtwork(
     req.params.id,
     req.user._id,
     req.file

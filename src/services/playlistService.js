@@ -1,254 +1,261 @@
-// src/services/playlistService.js
 const Playlist = require('../models/playlistModel');
-// 👇 Assuming your custom error class is in the utils folder.
-// Adjust the path or capitalization if your file is named differently!
-const AppError = require('../utils/appError');
 const Track = require('../models/trackModel');
+const AppError = require('../utils/appError');
 const notificationService = require('./notificationService');
 const Follow = require('../models/followModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 
-class PlaylistService {
-  // 1. Create a new playlist
-  static async createPlaylist(userId, playlistData) {
-    const playlist = new Playlist(playlistData);
-    playlist.creator = userId;
+// ==========================================
+// CREATE PLAYLIST
+// ==========================================
+exports.createPlaylist = async (userId, playlistData) => {
+  const playlist = new Playlist(playlistData);
+  playlist.creator = userId;
 
-    await playlist.save();
+  await playlist.save();
 
-    // ==========================================
-    // MODULE 10: NEW PLAYLIST NOTIFICATION
-    // Notify all followers if the playlist is public
-    // ==========================================
-    if (!playlist.isPrivate) {
-      Follow.find({ following: userId })
-        .then((followers) => {
-          followers.forEach((followDoc) => {
-            // NOTE: You may need to add a notifyNewPlaylist function to notificationService.js
-            // that mimics your notifyNewTrack function!
-            notificationService.notifyNewPlaylist(
-              followDoc.follower, // Recipient
-              userId, // Actor
-              playlist._id // Target (The Playlist)
-            );
-          });
-        })
-        .catch((err) => {
-          // eslint-disable-next-line no-console
-          console.error(
-            '[Notification Error] Failed to fetch followers for playlist alert:',
-            err
+  // Notify followers in the background — does not block the response
+  if (!playlist.isPrivate) {
+    Follow.find({ following: userId })
+      .then((followers) => {
+        followers.forEach((followDoc) => {
+          notificationService.notifyNewPlaylist(
+            followDoc.follower,
+            userId,
+            playlist._id
           );
         });
-    }
-
-    return playlist;
+      })
+      .catch((err) => {
+        console.error(
+          '[Notification Error] Failed to fetch followers for playlist alert:',
+          err
+        );
+      });
   }
 
-  // Fetch multiple playlists (Supports filtering by creator and handles privacy)
-  static async getAllPlaylists(queryParams, currentUser) {
-    // eslint-disable-next-line prefer-object-spread
-    const filter = Object.assign({}, queryParams);
+  const playlistObj = playlist.toObject();
+  delete playlistObj.secretToken;
+  delete playlistObj.__v;
+  return playlistObj;
+};
 
-    // PRIVACY LOGIC:
-    // If the frontend is searching for a specific user's playlists (e.g., viewing a profile)
-    if (filter.creator) {
-      // If no user is logged in, OR the logged-in user is NOT the creator they are searching for:
-      // Force the database to only return PUBLIC playlists.
-      if (
-        !currentUser ||
-        currentUser._id.toString() !== filter.creator.toString()
-      ) {
-        filter.isPrivate = false;
-      }
-    } else {
-      // If just browsing the platform generally, only show public playlists
+// ==========================================
+// GET ALL PLAYLISTS (browse / profile page)
+// ==========================================
+exports.getAllPlaylists = async (queryParams, currentUser) => {
+  const filter = { ...queryParams };
+
+  // If browsing a specific creator's playlists, only show private ones to the owner
+  if (filter.creator) {
+    if (
+      !currentUser ||
+      currentUser._id.toString() !== filter.creator.toString()
+    ) {
       filter.isPrivate = false;
     }
-
-    // Query the database, sort by newest first, and optionally populate the creator's display name
-    const playlists = await Playlist.find(filter)
-      .populate('creator', 'name') // Adjust 'name' to your User model's display field if needed
-      .sort('-createdAt');
-
-    return playlists;
+  } else {
+    // General browse — public only
+    filter.isPrivate = false;
   }
 
-  // 2. Read / Fetch a playlist (Handles Secret Token & Dead Tracks)
-  static async getPlaylist(playlistId, user, secretToken) {
-    // 1. Fetch the playlist and POPULATE the tracks array
-    // We use .populate() to pull the actual track documents from the Tracks collection
-    const playlist = await Playlist.findById(playlistId).populate({
-      path: 'tracks',
-      select: 'title artist duration audioUrl hlsUrl coverImage', // Only grab the fields the frontend needs
-    });
+  const playlists = await Playlist.find(filter)
+    .select(
+      'title permalink artworkUrl trackCount totalDuration releaseType genre tags isPrivate creator createdAt likeCount repostCount playCount'
+    )
+    .populate('creator', 'displayName permalink avatarUrl')
+    .sort('-createdAt');
 
-    if (!playlist) {
-      throw new AppError('Playlist not found', 404);
-    }
+  return playlists;
+};
 
-    // 2. Privacy Check (Keep your existing privacy logic here!)
-    if (playlist.isPrivate) {
-      const isCreator =
-        user && user._id.toString() === playlist.creator.toString();
-      const hasValidToken = secretToken && secretToken === playlist.secretToken;
+// ==========================================
+// GET SINGLE PLAYLIST
+// ==========================================
+exports.getPlaylist = async (playlistId, user, secretToken) => {
+  const playlist = await Playlist.findById(playlistId).populate({
+    path: 'tracks',
+    select: 'title permalink artworkUrl duration artist playCount likeCount',
+    populate: { path: 'artist', select: 'displayName permalink avatarUrl' },
+  });
 
-      if (!isCreator && !hasValidToken) {
-        throw new AppError(
-          'This playlist is private or the secret token is invalid.',
-          403
-        );
-      }
-    }
-
-    // 3. Calculate Total Duration dynamically
-    // We loop through the populated tracks and add up their durations
-    let totalDuration = 0;
-    if (playlist.tracks && playlist.tracks.length > 0) {
-      totalDuration = playlist.tracks.reduce(
-        (sum, track) => sum + (track.duration || 0),
-        0
-      );
-    }
-
-    // 4. Return the playlist with the calculated duration attached
-    // We convert the mongoose document to a plain object so we can add our custom field
-    const playlistData = playlist.toObject();
-    playlistData.totalDuration = totalDuration;
-
-    return playlistData;
+  if (!playlist) {
+    throw new AppError('Playlist not found', 404);
   }
 
-  // 3. Update metadata (Title, Description, Privacy)
-  static async updatePlaylist(playlistId, userId, updateData) {
-    const playlist = await Playlist.findOne({
-      _id: playlistId,
-      creator: userId,
-    });
+  // Privacy check
+  if (playlist.isPrivate) {
+    const isCreator =
+      user && user._id.toString() === playlist.creator.toString();
+    const hasValidToken = secretToken && secretToken === playlist.secretToken;
 
-    if (!playlist) {
+    if (!isCreator && !hasValidToken) {
       throw new AppError(
-        'Playlist not found or you are not authorized to edit it',
+        'This playlist is private or the secret token is invalid.',
         403
       );
     }
-
-    Object.assign(playlist, updateData);
-    return await playlist.save();
   }
 
-  // 4. Delete a playlist
-  static async deletePlaylist(playlistId, userId) {
-    const playlist = await Playlist.findOneAndDelete({
-      _id: playlistId,
-      creator: userId,
-    });
-
-    if (!playlist) {
-      throw new AppError(
-        'Playlist not found or you are not authorized to delete it',
-        403
-      );
-    }
-
-    return playlist;
-  }
-
-  // 5. Track Sequencing
-  static async updateTracks(playlistId, userId, newTracksArray) {
-    const playlist = await Playlist.findOne({
-      _id: playlistId,
-      creator: userId,
-    });
-
-    if (!playlist) {
-      throw new AppError('Playlist not found or unauthorized', 403);
-    }
-
-    // 1. Update the array and track count
-    playlist.tracks = newTracksArray;
-    playlist.trackCount = newTracksArray.length;
-
-    // 2. Fetch the newly added tracks to calculate total duration
-    // We import the Track model at the top of the file: const Track = require('../models/trackModel');
-
-    const tracksData = await Track.find({
-      _id: { $in: newTracksArray },
-    }).select('duration');
-
-    // 3. Sum up the durations
-    const totalDuration = tracksData.reduce(
+  // Calculate total duration from populated tracks
+  let totalDuration = 0;
+  if (playlist.tracks && playlist.tracks.length > 0) {
+    totalDuration = playlist.tracks.reduce(
       (sum, track) => sum + (track.duration || 0),
       0
     );
-    playlist.totalDuration = totalDuration;
-
-    await playlist.save();
-    return playlist;
   }
 
-  // ❌ DELETE the static async incrementPlayCount(playlistId) method completely!
-  // 6. Generate Simple Embed Code
-  static async getEmbedCode(playlistId, user, secretToken) {
-    const playlist = await Playlist.findById(playlistId);
+  const playlistData = playlist.toObject();
+  playlistData.totalDuration = totalDuration;
 
-    if (!playlist) {
-      throw new AppError('Playlist not found', 404);
-    }
+  // Never expose the secret token to the client
+  delete playlistData.secretToken;
+  delete playlistData.__v;
 
-    // Privacy Protection Logic
-    if (playlist.isPrivate) {
-      const isCreator =
-        user && user._id.toString() === playlist.creator.toString();
-      const hasValidToken = secretToken && secretToken === playlist.secretToken;
+  return playlistData;
+};
 
-      if (!isCreator && !hasValidToken) {
-        throw new AppError(
-          'You cannot generate an embed code for a private playlist without authorization.',
-          403
-        );
-      }
-    }
+// ==========================================
+// UPDATE PLAYLIST METADATA
+// ==========================================
+exports.updatePlaylist = async (playlistId, userId, updateData) => {
+  const playlist = await Playlist.findOne({
+    _id: playlistId,
+    creator: userId,
+  });
 
-    // If the playlist is private, we MUST append the secretToken to the iframe source URL
-    // so that the person viewing the embed elsewhere can actually hear the music.
-    const tokenParam = playlist.isPrivate
-      ? `?secretToken=${playlist.secretToken}`
-      : '';
-    const embedUrl = `https://your-frontend-domain.com/embed/playlist/${playlistId}${tokenParam}`;
-
-    const iframeCode = `<iframe width="100%" height="450" scrolling="no" frameborder="no" allow="autoplay" src="${embedUrl}"></iframe>`;
-
-    return { iframeCode, playlistId };
+  if (!playlist) {
+    throw new AppError(
+      'Playlist not found or you are not authorized to edit it',
+      403
+    );
   }
 
-  // 8. Upload Custom Artwork
-  static async uploadArtwork(playlistId, userId, file) {
-    // 1. Find the playlist and ensure the user owns it
-    const playlist = await Playlist.findOne({
-      _id: playlistId,
-      creator: userId,
-    });
+  Object.assign(playlist, updateData);
+  await playlist.save();
 
-    if (!playlist) {
+  const playlistObj = playlist.toObject();
+  delete playlistObj.secretToken;
+  delete playlistObj.__v;
+  return playlistObj;
+};
+
+// ==========================================
+// DELETE PLAYLIST
+// ==========================================
+exports.deletePlaylist = async (playlistId, userId) => {
+  const playlist = await Playlist.findOneAndDelete({
+    _id: playlistId,
+    creator: userId,
+  });
+
+  if (!playlist) {
+    throw new AppError(
+      'Playlist not found or you are not authorized to delete it',
+      403
+    );
+  }
+
+  return playlist;
+};
+
+// ==========================================
+// UPDATE TRACKS (sequencing / add / remove)
+// ==========================================
+exports.updateTracks = async (playlistId, userId, newTracksArray) => {
+  const playlist = await Playlist.findOne({
+    _id: playlistId,
+    creator: userId,
+  });
+
+  if (!playlist) {
+    throw new AppError('Playlist not found or unauthorized', 403);
+  }
+
+  playlist.tracks = newTracksArray;
+  playlist.trackCount = newTracksArray.length;
+
+  // Recalculate total duration from the new track list
+  const tracksData = await Track.find({
+    _id: { $in: newTracksArray },
+  }).select('duration');
+
+  const totalDuration = tracksData.reduce(
+    (sum, track) => sum + (track.duration || 0),
+    0
+  );
+  playlist.totalDuration = totalDuration;
+
+  await playlist.save();
+
+  const playlistObj = playlist.toObject();
+  delete playlistObj.secretToken;
+  delete playlistObj.__v;
+  return playlistObj;
+};
+
+// ==========================================
+// GET EMBED CODE
+// ==========================================
+exports.getEmbedCode = async (playlistId, user, secretToken) => {
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new AppError('Playlist not found', 404);
+  }
+
+  // Privacy check — same logic as getPlaylist
+  if (playlist.isPrivate) {
+    const isCreator =
+      user && user._id.toString() === playlist.creator.toString();
+    const hasValidToken = secretToken && secretToken === playlist.secretToken;
+
+    if (!isCreator && !hasValidToken) {
       throw new AppError(
-        'Playlist not found or you are not authorized to edit it',
+        'You cannot generate an embed code for a private playlist without authorization.',
         403
       );
     }
-
-    // 2. Upload the image buffer to Azure Blob Storage
-    // We pass 'playlists' as the folder name to keep your Azure container organized
-    const artworkUrl = await uploadImageToAzure(
-      file.buffer,
-      file.originalname,
-      'playlists'
-    );
-
-    // 3. Update the database with the new Azure URL
-    playlist.artworkUrl = artworkUrl;
-    return await playlist.save();
   }
-}
 
-module.exports = PlaylistService;
+  // Append secret token to the embed URL for private playlists
+  const tokenParam = playlist.isPrivate
+    ? `?secretToken=${playlist.secretToken}`
+    : '';
+  const embedUrl = `${process.env.FRONTEND_URL}/embed/playlist/${playlistId}${tokenParam}`;
+  const iframeCode = `<iframe width="100%" height="450" scrolling="no" frameborder="no" allow="autoplay" src="${embedUrl}"></iframe>`;
+
+  return { iframeCode, playlistId };
+};
+
+// ==========================================
+// UPLOAD ARTWORK
+// ==========================================
+exports.uploadArtwork = async (playlistId, userId, file) => {
+  const playlist = await Playlist.findOne({
+    _id: playlistId,
+    creator: userId,
+  });
+
+  if (!playlist) {
+    throw new AppError(
+      'Playlist not found or you are not authorized to edit it',
+      403
+    );
+  }
+
+  const artworkUrl = await uploadImageToAzure(
+    file.buffer,
+    file.originalname,
+    'playlists'
+  );
+
+  playlist.artworkUrl = artworkUrl;
+  await playlist.save();
+
+  const playlistObj = playlist.toObject();
+  delete playlistObj.secretToken;
+  delete playlistObj.__v;
+  return playlistObj;
+};
