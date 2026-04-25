@@ -102,8 +102,8 @@ exports.deleteNotification = catchAsync(async (req, res, next) => {
     );
   }
 
-  res.status(204).json({
+  res.status(200).json({
     success: true,
-    data: null,
+    message: 'Notification deleted successfully.',
   });
 });

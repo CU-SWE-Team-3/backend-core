@@ -110,7 +110,7 @@ exports.getFollowers = async (userId, page = 1, limit = 20) => {
   const followers = await Follow.find({ following: userId })
     .populate(
       'follower',
-      'displayName permalink avatarUrl role isPremium followerCount followingCount'
+      'displayName permalink avatarUrl followerCount followingCount'
     )
     .skip(skip)
     .limit(limit)
@@ -124,7 +124,7 @@ exports.getFollowing = async (userId, page = 1, limit = 20) => {
   const following = await Follow.find({ follower: userId })
     .populate(
       'following',
-      'displayName permalink avatarUrl role isPremium followerCount followingCount'
+      'displayName permalink avatarUrl followerCount followingCount'
     )
     .skip(skip)
     .limit(limit)
@@ -178,7 +178,7 @@ exports.getSuggestedUsers = async (currentUserId, page = 1, limit = 10) => {
       suggestedUsers = await User.find({
         _id: { $in: mutualIds },
         accountStatus: 'Active',
-      }).select('displayName permalink avatarUrl followerCount role');
+      }).select('displayName permalink avatarUrl followerCount');
     }
   }
 
@@ -195,7 +195,7 @@ exports.getSuggestedUsers = async (currentUserId, page = 1, limit = 10) => {
       _id: { $nin: newExcludedIds },
       accountStatus: 'Active',
     })
-      .select('displayName permalink avatarUrl followerCount role')
+      .select('displayName permalink avatarUrl followerCount')
       .sort({ followerCount: -1 })
       .skip(skip)
       .limit(remainingLimit);

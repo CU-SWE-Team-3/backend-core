@@ -372,14 +372,21 @@ exports.getTrackByPermalink = async (permalink, requestingUserId = null) => {
     }
   }
 
-  if (!track.displayStatsPublicly) {
-    track.playCount = undefined;
-    track.likeCount = undefined;
-    track.repostCount = undefined;
-    track.commentCount = undefined;
+  const trackObj = track.toObject();
+
+  if (!trackObj.displayStatsPublicly) {
+    trackObj.playCount = null;
+    trackObj.likeCount = null;
+    trackObj.repostCount = null;
+    trackObj.commentCount = null;
   }
 
-  return track;
+  delete trackObj.moderationStatus;
+  delete trackObj.isPromoted;
+  delete trackObj.audioUrl;
+  delete trackObj.__v;
+
+  return trackObj;
 };
 
 // 4. DOWNLOAD TRACK (Module 12: Premium Offline Listening)

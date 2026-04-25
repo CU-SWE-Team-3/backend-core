@@ -91,8 +91,8 @@ exports.getUserNotifications = async (userId, page = 1, limit = 20) => {
     .sort('-updatedAt')
     .skip(skip)
     .limit(limit)
-    .populate('actors', 'displayName avatarUrl permalink')
-    .populate('target', 'title permalink');
+    .populate('actors', 'displayName avatarUrl permalink isPremium')
+    .populate('target', 'title permalink artworkUrl');
 
   const total = await Notification.countDocuments({ recipient: userId });
 

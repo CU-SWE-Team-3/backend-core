@@ -73,7 +73,7 @@ exports.getRecentlyPlayed = async (userId, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
 
   const history = await ListenHistory.find({ user: userId, type: 'track' })
-    .select('-__v')
+    .select('-__v -isPlayCounted')
     .sort({ playedAt: -1 })
     .skip(skip)
     .limit(limit)

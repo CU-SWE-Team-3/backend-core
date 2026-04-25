@@ -61,8 +61,10 @@ exports.performGlobalSearch = async (
 
   // In searchService.js inside performGlobalSearch
   const trackQuery = Track.find(trackMatch, { score: { $meta: 'textScore' } })
+    .select(
+      'title permalink artworkUrl duration genre tags playCount likeCount repostCount commentCount containsExplicitContent releaseDate artist'
+    )
     .populate('artist', 'displayName permalink avatarUrl')
-    // CHANGE: Sort by viralScore instead of playCount
     .sort({ score: { $meta: 'textScore' }, isPromoted: -1, viralScore: -1 })
     .skip(skip)
     .limit(limit)
@@ -91,7 +93,10 @@ exports.performGlobalSearch = async (
     },
     { score: { $meta: 'textScore' } }
   )
-    .populate('creator', 'displayName')
+    .select(
+      'title permalink artworkUrl trackCount totalDuration releaseType genre creator createdAt'
+    )
+    .populate('creator', 'displayName permalink avatarUrl')
     .sort({ score: { $meta: 'textScore' } })
     .skip(skip)
     .limit(limit)

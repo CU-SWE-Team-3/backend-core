@@ -132,7 +132,6 @@ app.use('/api/player', playerRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/discovery', discoveryRoutes);
-
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/feed', feedRoutes);

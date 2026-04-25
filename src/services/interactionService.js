@@ -136,8 +136,7 @@ exports.getTrackEngagers = async (
     .populate({
       path: 'actorId',
       // NEW: Added role, isPremium, and isEmailVerified so the frontend can display badges!
-      select:
-        'displayName permalink avatarUrl followerCount role isPremium isEmailVerified',
+      select: 'displayName permalink avatarUrl followerCount role isPremium',
     });
 
   const total = await Interaction.countDocuments({

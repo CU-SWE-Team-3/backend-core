@@ -79,7 +79,7 @@ exports.updateMetadata = catchAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Track metadata updated successfully',
-    data: { track: updatedTrack },
+    data: { track: formatTrack(updatedTrack) },
   });
 });
 
@@ -108,7 +108,10 @@ exports.updateVisibility = catchAsync(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: `Track is now ${isPublic ? 'Public' : 'Private'}`,
-    data: { track: updatedTrack },
+    data: {
+      trackId: updatedTrack._id,
+      isPublic: updatedTrack.isPublic,
+    },
   });
 });
 /**
@@ -153,6 +156,7 @@ exports.confirmUpload = catchAsync(async (req, res, next) => {
       trackId: track._id,
       permalink: track.permalink,
       title: track.title,
+      artworkUrl: track.artworkUrl,
       processingState: track.processingState,
     },
   });

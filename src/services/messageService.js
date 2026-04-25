@@ -233,7 +233,16 @@ exports.sendMessage = async (
     );
   } //
 
-  return newMessage;
+  return {
+    _id: newMessage._id,
+    conversationId: newMessage.conversationId,
+    senderId: newMessage.senderId,
+    content: newMessage.content,
+    attachment: newMessage.attachment,
+    status: newMessage.status,
+    createdAt: newMessage.createdAt,
+    updatedAt: newMessage.updatedAt,
+  };
 };
 
 exports.markMessagesAsRead = async (conversationId, userId) => {
@@ -325,12 +334,23 @@ exports.getUserConversations = async (userId, page, limit) => {
 
   const formattedConversations = conversations.map((conv) => {
     const unreadCount = conv.unreadCounts.get(userId.toString()) || 0;
+    const lm = conv.lastMessage;
     return {
       _id: conv._id,
       participants: conv.participants.filter(
         (p) => p._id.toString() !== userId.toString()
       ),
-      lastMessage: conv.lastMessage,
+      lastMessage: lm
+        ? {
+            _id: lm._id,
+            content: lm.isDeleted ? null : lm.content,
+            attachment: lm.isDeleted ? null : lm.attachment,
+            senderId: lm.senderId,
+            status: lm.status,
+            isDeleted: lm.isDeleted,
+            createdAt: lm.createdAt,
+          }
+        : null,
       unreadCount,
       updatedAt: conv.updatedAt,
     };
@@ -370,7 +390,7 @@ exports.getConversationMessages = async (
     .limit(limit)
     .populate({
       path: 'attachment.referenceId',
-      select: 'title artworkUrl permalink duration hls waveform',
+      select: 'title artworkUrl permalink duration waveform',
       model: 'Track',
     });
 

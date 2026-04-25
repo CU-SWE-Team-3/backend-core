@@ -19,7 +19,7 @@ exports.getUserFeed = async (userId, cursor = null, limit = 40) => {
     .populate({
       path: 'targetId',
       select:
-        'title permalink artworkUrl duration artist creator isPublic moderationStatus',
+        'title permalink artworkUrl duration artist creator playCount likeCount repostCount',
       populate: [
         {
           path: 'artist',
@@ -122,10 +122,10 @@ exports.getUserFeed = async (userId, cursor = null, limit = 40) => {
       activityDate: new Date(),
       actors: [
         {
-          _id: 'soundcloud_ad_system',
-          displayName: 'SoundCloud Sponsored',
-          permalink: 'soundcloud-ads',
-          avatarUrl: 'https://cdn-icons-png.flaticon.com/512/196/196566.png',
+          _id: null,
+          displayName: 'BioBeats',
+          permalink: 'biobeats',
+          avatarUrl: null,
         },
       ],
       target: promotedTrack,

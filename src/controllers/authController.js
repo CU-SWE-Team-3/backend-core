@@ -84,9 +84,11 @@ exports.loginWithGoogleMobile = catchAsync(async (req, res, next) => {
   const { user, token, refreshToken } =
     await authService.handleMobileGoogleLogin(idToken);
 
+  attachAuthCookies(res, token, refreshToken);
+
   res.status(200).json({
     success: true,
-    data: { user: formatUser(user), token, refreshToken },
+    data: { user: formatUser(user) },
   });
 });
 

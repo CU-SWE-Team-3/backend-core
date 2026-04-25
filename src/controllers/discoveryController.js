@@ -1,12 +1,16 @@
+// src/controllers/discoveryController.js  — FULL FILE (replace existing)
+
 const discoveryService = require('../services/discoveryService');
 const catchAsync = require('../utils/catchAsync');
+
+// ── Existing ──────────────────────────────────────────────────────────────────
 
 exports.getTrendingStation = catchAsync(async (req, res, next) => {
   const trendingTracks = await discoveryService.getTrendingTracks();
 
   res.status(200).json({
     status: 'success',
-    results: trendingTracks.length, // <--- ADDED THIS LINE
+    results: trendingTracks.length,
     data: { tracks: trendingTracks },
   });
 });
@@ -18,7 +22,7 @@ exports.getStationBasedOnLikes = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    results: recommendedTracks.length, // <--- ADDED THIS LINE
+    results: recommendedTracks.length,
     data: { tracks: recommendedTracks },
   });
 });
@@ -29,7 +33,7 @@ exports.getStationByGenre = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    results: tracks.length, // <--- ADDED THIS LINE
+    results: tracks.length,
     data: { tracks },
   });
 });
@@ -40,13 +44,11 @@ exports.getStationByArtist = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    results: tracks.length, // <--- ADDED THIS LINE
+    results: tracks.length,
     data: { tracks },
   });
 });
-// ... (keep your existing getTrendingStation, getStationBasedOnLikes, etc.)
 
-// 🌟 BONUS: Get Related Tracks
 exports.getRelatedTracks = catchAsync(async (req, res, next) => {
   const { trackId } = req.params;
   const tracks = await discoveryService.getRelatedTracks(trackId);
@@ -58,7 +60,6 @@ exports.getRelatedTracks = catchAsync(async (req, res, next) => {
   });
 });
 
-// 🌟 BONUS: Get Collaborative Filtering Tracks
 exports.getUsersWhoLikedAlsoLiked = catchAsync(async (req, res, next) => {
   const { trackId } = req.params;
   const tracks = await discoveryService.getUsersWhoLikedAlsoLiked(trackId);
@@ -67,5 +68,51 @@ exports.getUsersWhoLikedAlsoLiked = catchAsync(async (req, res, next) => {
     status: 'success',
     results: tracks.length,
     data: { tracks },
+  });
+});
+
+// ── New ───────────────────────────────────────────────────────────────────────
+
+// GET /api/discovery/more-like-liked
+// Returns up to 20 tracks matching genres the user has liked
+// Falls back to trending if the user has no likes yet
+exports.getMoreOfWhatYouLike = catchAsync(async (req, res, next) => {
+  const result = await discoveryService.getMoreOfWhatYouLike(req.user._id);
+
+  res.status(200).json({
+    status: 'success',
+    results: result.tracks.length,
+    data: {
+      tracks: result.tracks,
+      basedOn: result.basedOn, // 'likes' | 'trending'
+      genres: result.genres, // genres used to build the list
+    },
+  });
+});
+
+// GET /api/discovery/mixed-for-you
+// Returns an array of named stations: top genres + liked artist + trending
+// Each station has: { id, title, description, type, tracks[] }
+exports.getMixedForYou = catchAsync(async (req, res, next) => {
+  const stations = await discoveryService.getMixedForYou(req.user._id);
+
+  res.status(200).json({
+    status: 'success',
+    results: stations.length,
+    data: { stations },
+  });
+});
+
+// GET /api/discovery/curated
+// Public endpoint — no auth required
+// Returns themed editorial buckets: fresh finds, trending, spotlight, top genres
+// Each bucket has: { id, title, description, curatedBy, tracks[] }
+exports.getCuratedByPlatform = catchAsync(async (req, res, next) => {
+  const curated = await discoveryService.getCuratedByPlatform();
+
+  res.status(200).json({
+    status: 'success',
+    results: curated.length,
+    data: { curated },
   });
 });

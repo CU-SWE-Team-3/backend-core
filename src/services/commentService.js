@@ -175,13 +175,10 @@ exports.deleteComment = async (userId, commentId) => {
       },
     },
   ]);
-  if (track) {
-    // Ensure imported at the top
-    notificationService.retractNotification(
-      track.artist,
-      userId,
-      'COMMENT',
-      track._id
-    );
-  }
+  notificationService.retractNotification(
+    comment.track,
+    userId,
+    'COMMENT',
+    comment.track
+  );
 };
