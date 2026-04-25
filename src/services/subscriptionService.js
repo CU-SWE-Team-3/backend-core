@@ -10,8 +10,10 @@ exports.createStripeCheckout = async (user, planType) => {
 
   // 2. Map the requested plan to the actual Stripe Price ID
   let priceId;
-  if (planType === 'Pro') priceId = process.env.STRIPE_PRICE_PRO;
-  else if (planType === 'Go+') priceId = process.env.STRIPE_PRICE_GO_PLUS;
+  if (planType === 'Pro' && user.role === 'Artist')
+    priceId = process.env.STRIPE_PRICE_PRO;
+  else if (planType === 'Go+' && user.role === 'Listener')
+    priceId = process.env.STRIPE_PRICE_GO_PLUS;
   else throw new AppError('Invalid plan type', 400);
 
   // 3. Create the Stripe Checkout Session

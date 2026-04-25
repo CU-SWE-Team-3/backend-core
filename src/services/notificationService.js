@@ -1,6 +1,9 @@
 // src/services/notificationService.js
 const Notification = require('../models/notificationModel');
 const { getIo } = require('../sockets/socketSetup');
+const User = require('../models/userModel'); // DEVELOPER D
+const firebaseService = require('./firebaseService'); // DEVELOPER D
+const AppError = require('../utils/appError');
 
 /**
  * Helper to emit events via Socket.IO.
@@ -48,7 +51,7 @@ const processNotification = async ({
       if (!actorAlreadyIncluded) {
         notification.actorCount += 1;
         notification.actors.unshift(actorId);
-        // Keep max 3 actors for the preview UI (e.g., "User A, User B, and 2 others")
+        // Keep max 3 actors for the preview UI
         if (notification.actors.length > 3) notification.actors.pop();
         await notification.save();
       }
@@ -72,6 +75,93 @@ const processNotification = async ({
 
     // 4. EMIT VIA WEBSOCKETS
     emitRealTimeNotification(recipientId, populatedNotification);
+
+    // ==========================================
+    // 5. DEVELOPER D: PUSH NOTIFICATION & FILTERING
+    // ==========================================
+    const recipient = await User.findById(recipientId).select(
+      'fcmTokens notificationSettings'
+    );
+
+    // If no user, or global push is disabled, or no devices are registered -> Abort Push
+    if (
+      !recipient ||
+      !recipient.notificationSettings?.pushEnabled ||
+      !recipient.fcmTokens?.length
+    ) {
+      return populatedNotification;
+    }
+
+    const settings = recipient.notificationSettings;
+    const actorName = populatedNotification.actors[0]?.displayName || 'Someone';
+
+    let pushTitle = '';
+    let pushBody = '';
+    let shouldPush = false;
+
+    switch (type) {
+      case 'LIKE':
+        if (settings.allowLikes) {
+          shouldPush = true;
+          pushTitle = 'New Like';
+          pushBody = `${actorName} liked your ${targetModel.toLowerCase()}`;
+        }
+        break;
+      case 'REPOST':
+        if (settings.allowReposts) {
+          shouldPush = true;
+          pushTitle = 'New Repost';
+          pushBody = `${actorName} reposted your ${targetModel.toLowerCase()}`;
+        }
+        break;
+      case 'COMMENT':
+        if (settings.allowComments) {
+          shouldPush = true;
+          pushTitle = 'New Comment';
+          pushBody = `${actorName} commented: "${contentSnippet}"`;
+        }
+        break;
+      case 'FOLLOW':
+        if (settings.allowFollows) {
+          shouldPush = true;
+          pushTitle = 'New Follower';
+          pushBody = `${actorName} started following you`;
+        }
+        break;
+      case 'MESSAGE':
+        if (settings.allowMessages) {
+          shouldPush = true;
+          pushTitle = `Message from ${actorName}`;
+          pushBody = contentSnippet;
+        }
+        break;
+      case 'NEW_TRACK':
+        if (settings.allowNewTracks) {
+          shouldPush = true;
+          pushTitle = 'New Track Alert';
+          pushBody = `${actorName} just uploaded a new track!`;
+        }
+        break;
+      case 'MENTION':
+      case 'SYSTEM':
+        shouldPush = true;
+        pushTitle = type === 'SYSTEM' ? 'BioBeats Alert' : 'You were mentioned';
+        pushBody = contentSnippet || `You have a new ${type.toLowerCase()}`;
+        break;
+    }
+
+    if (shouldPush) {
+      await firebaseService.sendPushNotification(
+        recipient.fcmTokens,
+        pushTitle,
+        pushBody,
+        {
+          notificationId: populatedNotification._id.toString(),
+          type: type,
+          targetId: targetId ? targetId.toString() : '',
+        }
+      );
+    }
 
     return populatedNotification;
   } catch (error) {
@@ -122,7 +212,6 @@ exports.markAllAsRead = async (userId) => {
     { $set: { isRead: true } }
   );
 
-  // Sync across all user's devices
   try {
     const io = getIo();
     io.to(`user_${userId.toString()}`).emit('all_notifications_read');
@@ -136,25 +225,17 @@ exports.markAllAsRead = async (userId) => {
 };
 
 exports.markOneAsRead = async (userId, notificationId) => {
-  // 1. Find the notification first
   const notification = await Notification.findOne({
     _id: notificationId,
     recipient: userId,
   });
 
-  // 2. If it doesn't exist, return null so the controller can throw a 404
   if (!notification) return null;
+  if (notification.isRead) return notification;
 
-  // 3. If it is ALREADY read, just return it. Do NOT save to DB or emit socket.
-  if (notification.isRead) {
-    return notification;
-  }
-
-  // 4. If it was unread, update it and save
   notification.isRead = true;
   await notification.save();
 
-  // 5. Emit the socket event ONLY because the state actually changed
   try {
     const io = getIo();
     io.to(`user_${userId.toString()}`).emit('notification_read', {
@@ -195,7 +276,6 @@ exports.deleteNotification = async (userId, notificationId) => {
 // STANDARD TRIGGERS
 // ==========================================
 
-// Defaults to 'Track' just to be safe, but the other dev is passing it dynamically now
 exports.notifyLike = async (
   ownerId,
   likerId,
@@ -349,7 +429,6 @@ exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
     };
 
     const notification = await Notification.create(notificationPayload);
-
     emitRealTimeNotification(recipientId, notification);
   } catch (error) {
     console.error(
@@ -379,7 +458,6 @@ exports.retractNotification = async (recipientId, actorId, type, targetId) => {
 
       if (notification.actorCount === 0) {
         await Notification.findByIdAndDelete(notification._id);
-
         try {
           const io = getIo();
           io.to(`user_${recipientId.toString()}`).emit('notification_deleted', {
@@ -400,4 +478,42 @@ exports.retractNotification = async (recipientId, actorId, type, targetId) => {
       error
     );
   }
+};
+
+exports.addFcmToken = async (userId, token) => {
+  await User.findByIdAndUpdate(userId, {
+    $addToSet: { fcmTokens: token },
+  });
+};
+
+exports.removeFcmToken = async (userId, token) => {
+  await User.findByIdAndUpdate(userId, {
+    $pull: { fcmTokens: token },
+  });
+};
+
+exports.updatePreferences = async (userId, preferences) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError('User not found', 404);
+
+  // List of allowed fields so users can't inject random data into your DB
+  const allowedFields = [
+    'pushEnabled',
+    'allowLikes',
+    'allowReposts',
+    'allowComments',
+    'allowFollows',
+    'allowMessages',
+    'allowNewTracks',
+  ];
+
+  // Loop through allowed fields and update if provided
+  allowedFields.forEach((field) => {
+    if (preferences[field] !== undefined) {
+      user.notificationSettings[field] = preferences[field];
+    }
+  });
+
+  await user.save({ validateModifiedOnly: true });
+  return user.notificationSettings;
 };

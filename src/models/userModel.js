@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const slug = require('mongoose-slug-updater');
 
 mongoose.plugin(slug);
+
 const VALID_COUNTRIES = [
   '', // CRITICAL: Allows empty string for default users
   'Egypt',
@@ -28,6 +29,7 @@ const VALID_COUNTRIES = [
   'Argentina',
   'Mexico',
 ];
+
 const userSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -40,15 +42,24 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    notificationPreferences: {
-      likes: { type: Boolean, default: true },
-      reposts: { type: Boolean, default: true },
-      comments: { type: Boolean, default: true },
-      newFollowers: { type: Boolean, default: true },
-      messages: { type: Boolean, default: true },
-      newTracks: { type: Boolean, default: true },
-      mentions: { type: Boolean, default: true },
+
+    // DEVELOPER D: Updated Notification Settings & FCM Tokens
+    fcmTokens: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
+    notificationSettings: {
+      pushEnabled: { type: Boolean, default: true }, // Global kill switch
+      allowLikes: { type: Boolean, default: true },
+      allowReposts: { type: Boolean, default: true },
+      allowComments: { type: Boolean, default: true },
+      allowFollows: { type: Boolean, default: true },
+      allowMessages: { type: Boolean, default: true },
+      allowNewTracks: { type: Boolean, default: true },
     },
+
     password: {
       type: String,
       required: function () {
@@ -74,7 +85,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
-      slug: 'displayName', // <--- 3. THIS IS THE MAGIC LINE!
+      slug: 'displayName',
       slugPaddingSize: 1,
     },
     displayName: {
@@ -123,13 +134,14 @@ const userSchema = new mongoose.Schema(
       default: 'default-avatar.png',
     },
     coverUrl: {
-      // Merged from coverPhotoUrl
       type: String,
       default: 'default-cover.png',
     },
-    //payment details
+
+    // payment details
     stripeCustomerId: { type: String },
     stripeSubscriptionId: { type: String },
+
     // ==========================================
     // 3. ROLES, PRIVACY & STATUS (BE-4)
     // ==========================================
@@ -148,7 +160,7 @@ const userSchema = new mongoose.Schema(
       default: 'Active',
     },
 
-    // yehia module 12
+    // module 12
     subscriptionPlan: {
       type: String,
       enum: ['Free', 'Pro', 'Go+'],
@@ -166,6 +178,7 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
     // ==========================================
     // BE-1: VERIFICATION & RECOVERY TOKENS
     // ==========================================
@@ -221,9 +234,13 @@ userSchema.methods.toJSON = function () {
   return userObject;
 };
 
+// ==========================================
+// INDEXES
+// ==========================================
+// Combined text index (MongoDB only allows one text index per collection)
 userSchema.index(
   { displayName: 'text', permalink: 'text' },
   { weights: { displayName: 5, permalink: 3 }, name: 'UserTextIndex' }
 );
-userSchema.index({ displayName: 'text' });
+
 module.exports = mongoose.model('User', userSchema);

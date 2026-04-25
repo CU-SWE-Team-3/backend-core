@@ -99,11 +99,6 @@ const trackSchema = new mongoose.Schema(
       default: 'Approved', // Controlled ONLY by Admins
     },
 
-    isPromoted: {
-      type: Boolean,
-      default: false, // Forces all normal tracks to be "false" so frontend doesn't break
-    },
-
     // ==========================================
     // BE-2: AUDIO PIPELINE (Placeholders)
     // ==========================================
