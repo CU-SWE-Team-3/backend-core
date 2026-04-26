@@ -7,7 +7,10 @@ const Cache = require('../models/cacheModel');
 // ── Existing (unchanged) ──────────────────────────────────────────────────────
 
 exports.getTrendingTracks = async (limit = 20, genre = null) => {
-  const parsedLimit = parseInt(limit, 10);
+  let parsedLimit = parseInt(limit, 10);
+  if (isNaN(parsedLimit) || parsedLimit <= 0) {
+    parsedLimit = 20; // Safe default
+  }
   const cacheKey = `trending_${genre || 'all'}_${parsedLimit}`;
 
   const cachedRecord = await Cache.findOne({ key: cacheKey }).lean();
