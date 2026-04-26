@@ -34,11 +34,19 @@ exports.getTrendingTracks = async (limit = 20, genre = null) => {
     .populate({ path: 'artist', select: 'displayName permalink avatarUrl' })
     .lean();
 
-  await Cache.findOneAndUpdate(
-    { key: cacheKey },
-    { data: trendingTracks, createdAt: new Date() },
-    { upsert: true, new: true }
-  );
+  try {
+    await Cache.findOneAndUpdate(
+      { key: cacheKey },
+      { data: trendingTracks, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+  } catch (error) {
+    // If error is 11000 (Duplicate Key), it means a concurrent request
+    // already created the cache a millisecond ago. We can safely ignore it!
+    if (error.code !== 11000) {
+      console.error('MongoDB Cache Upsert Error:', error);
+    }
+  }
 
   return trendingTracks;
 };
