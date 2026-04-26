@@ -6,18 +6,31 @@ const catchAsync = require('../utils/catchAsync');
 // ── Existing ──────────────────────────────────────────────────────────────────
 
 exports.getTrendingCharts = catchAsync(async (req, res, next) => {
-  const limit = parseInt(req.query.limit, 10) || 20;
-  const { genre } = req.query;
+  try {
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const { genre } = req.query;
 
-  const trendingTracks = await discoveryService.getTrendingTracks(limit, genre);
+    const trendingTracks = await discoveryService.getTrendingTracks(
+      limit,
+      genre
+    );
 
-  res.status(200).json({
-    success: true,
-    results: trendingTracks.length,
-    data: {
-      trending: trendingTracks,
-    },
-  });
+    res.status(200).json({
+      success: true,
+      results: trendingTracks?.length || 0,
+      data: {
+        trending: trendingTracks,
+      },
+    });
+  } catch (error) {
+    // 🛑 TEMPORARY BLIND DEBUGGING 🛑
+    // Instead of a generic 500, we force it to tell us the exact line that broke.
+    res.status(500).json({
+      success: false,
+      crash_message: error.message, // This will say something like "Cache is not defined"
+      crash_location: error.stack, // This will tell us the exact line number!
+    });
+  }
 });
 
 exports.getStationBasedOnLikes = catchAsync(async (req, res, next) => {
