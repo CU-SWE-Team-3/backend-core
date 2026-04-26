@@ -27,7 +27,7 @@ exports.getTrendingTracks = async (limit = 20, genre = null) => {
 
   const trendingTracks = await Track.find(matchQuery)
     .select(
-      'title permalink artworkUrl duration genre tags playCount likeCount repostCount commentCount containsExplicitContent releaseDate artist'
+      'title permalink artworkUrl hlsUrl duration genre tags playCount likeCount repostCount commentCount containsExplicitContent releaseDate artist'
     )
     .sort({ viralScore: -1 })
     .limit(parsedLimit)
@@ -80,7 +80,7 @@ exports.getRecommendedBasedOnLikes = async (userId) => {
     processingState: 'Finished',
   })
     .select(
-      'title permalink artworkUrl duration genre tags playCount likeCount repostCount commentCount containsExplicitContent releaseDate artist'
+      'title permalink artworkUrl hlsUrl audioUrl duration genre tags playCount likeCount repostCount commentCount containsExplicitContent releaseDate artist'
     )
     .sort({ playCount: -1 })
     .limit(15)
