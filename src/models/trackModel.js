@@ -271,6 +271,13 @@ trackSchema.index(
   { weights: { title: 5, tags: 2 }, name: 'TrackTextIndex' }
 );
 
+trackSchema.index({
+  isPublic: 1,
+  moderationStatus: 1,
+  processingState: 1,
+  viralScore: -1,
+});
+
 const Track = mongoose.model('Track', trackSchema);
 
 module.exports = Track;

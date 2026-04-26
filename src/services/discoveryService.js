@@ -31,6 +31,7 @@ exports.getTrendingTracks = async (limit = 20, genre = null) => {
     )
     .sort({ viralScore: -1 })
     .limit(parsedLimit)
+    .allowDiskUse(true) // 👈 ADD THIS LINE
     .populate({ path: 'artist', select: 'displayName permalink avatarUrl' })
     .lean();
 
