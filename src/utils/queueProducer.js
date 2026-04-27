@@ -25,7 +25,7 @@ const channelWrapper = connection.createChannel({
     await channel.assertQueue(audioDlq, { durable: true });
     await channel.bindQueue(audioDlq, audioDlx, 'failed_audio');
 
-    const audioQueue = 'audio_processing_queue_v4';
+    const audioQueue = 'audio_processing_queue_v5';
     await channel.assertQueue(audioQueue, {
       durable: true,
       arguments: {

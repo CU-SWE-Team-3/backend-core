@@ -54,7 +54,7 @@ const startWorker = async () => {
       await channel.bindQueue(dlq, dlx, 'failed_audio');
 
       // Assert Main Queue with Dead-Letter Arguments
-      const queueName = 'audio_processing_queue_v4';
+      const queueName = 'audio_processing_queue_v5';
       await channel.assertQueue(queueName, {
         durable: true,
         arguments: {
