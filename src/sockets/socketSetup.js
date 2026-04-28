@@ -44,7 +44,7 @@ const initializeSockets = (server) => {
       );
 
       // Return the actual error message to the mobile team so they can debug their side
-      return next(new Error(`Authentication error: ${error.message}`));
+      return next(new Error(`Authentication error: Invalid or expired token`));
     }
   });
 
