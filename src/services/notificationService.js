@@ -159,6 +159,7 @@ const processNotification = async ({
           notificationId: populatedNotification._id.toString(),
           type: type,
           targetId: targetId ? targetId.toString() : '',
+          ...extraData,
         }
       );
     }
@@ -363,6 +364,7 @@ exports.notifyMessage = async (
     targetId: messageId,
     targetModel: 'Message',
     contentSnippet: snippet,
+    extraData: { conversationId: conversationId.toString() },
   });
 };
 

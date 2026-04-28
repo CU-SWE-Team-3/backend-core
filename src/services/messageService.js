@@ -229,6 +229,7 @@ exports.sendMessage = async (
       receiverId,
       senderId,
       newMessage._id,
+      conversation._id,
       notificationText
     );
   } //
