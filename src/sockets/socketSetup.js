@@ -31,11 +31,7 @@ const initializeSockets = (server) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // 4. Attach user data.
-      // Pro-tip: Match your REST middleware property name (e.g., decoded.id)
-      socket.user = {
-        id: decoded.id,
-        ...decoded,
-      };
+      socket.user = decoded;
 
       next();
     } catch (error) {
