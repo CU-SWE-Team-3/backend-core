@@ -26,6 +26,7 @@ const messageSchema = new mongoose.Schema(
       },
       referenceId: {
         type: mongoose.Schema.Types.ObjectId, // Ref to Track or Playlist
+        refPath: 'attachment.type',
         default: null,
       },
     },

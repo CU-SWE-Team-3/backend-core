@@ -1,8 +1,6 @@
 // src/controllers/adminController.js
 const adminService = require('../services/adminService');
 const catchAsync = require('../utils/catchAsync');
-const notificationService = require('../services/notificationService');
-const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 
 exports.getDashboardStats = catchAsync(async (req, res, next) => {

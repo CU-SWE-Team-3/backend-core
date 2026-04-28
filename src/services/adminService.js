@@ -5,7 +5,7 @@ const ListenHistory = require('../models/listenHistoryModel');
 const Report = require('../models/reportModel');
 const notificationService = require('./notificationService');
 const subscriptionService = require('./subscriptionService');
-const sendEmail = require('../utils/sendEmail'); // <--- Add this import
+const sendEmail = require('../utils/sendEmail');
 const AppError = require('../utils/appError');
 
 // ============================================================================
@@ -18,9 +18,9 @@ exports.getPlatformAnalytics = async () => {
     { $group: { _id: '$role', count: { $sum: 1 } } },
   ]);
 
-  let totalUsers = 0,
-    totalArtists = 0,
-    totalListeners = 0;
+  let totalUsers = 0;
+  let totalArtists = 0;
+  let totalListeners = 0;
 
   userStats.forEach((stat) => {
     totalUsers += stat.count;
@@ -33,34 +33,64 @@ exports.getPlatformAnalytics = async () => {
       ? (totalArtists / totalListeners).toFixed(2)
       : totalArtists;
 
-  // --- 2. Track Stats ---
+  // --- 2. Track Stats & Storage ---
+  // We include 'totalBytes' here to avoid a separate DB call
   const trackStats = await Track.aggregate([
     {
       $group: {
         _id: null,
         totalTracks: { $sum: 1 },
         totalPlays: { $sum: '$playCount' },
+        totalBytes: { $sum: '$size' },
       },
     },
   ]);
 
-  // --- 3. Subscriptions & Revenue (Best Practice: Fetched from Subscription Service) ---
-  // هنا احنا بنكلم الـ Service المختصة عشان نجيب الداتا، من غير ما نعرف الأسعار جوا الـ Admin
+  const stats = trackStats[0] || {
+    totalTracks: 0,
+    totalPlays: 0,
+    totalBytes: 0,
+  };
+
+  // --- 3. Play-Through Rate Logic ---
+  const completedPlays = await ListenHistory.countDocuments({
+    isPlayCounted: true,
+    type: 'track',
+  });
+
+  const playThroughRate =
+    stats.totalPlays > 0
+      ? `${((completedPlays / stats.totalPlays) * 100).toFixed(2)}%`
+      : '0%';
+
+  // --- 4. Storage Formatting ---
+  const totalStorageUsed = `${(stats.totalBytes / (1024 * 1024)).toFixed(2)} MB`;
+
+  // --- 5. Subscriptions & Revenue ---
   const subStats = await subscriptionService.getRevenueStats();
 
   return {
     // General Platform Stats
     totalUsers,
     artistToListenerRatio,
-    totalTracks: trackStats[0]?.totalTracks || 0,
-    totalPlays: trackStats[0]?.totalPlays || 0,
+    totalTracks: stats.totalTracks,
+    totalPlays: stats.totalPlays,
+    playThroughRate, // New Metric
+    totalStorageUsed, // New Metric
 
     // Core Financials
     activeSubscriptions: subStats.activeSubscriptions,
     totalRevenue: subStats.totalRevenue,
 
-    // Detailed SoundCloud-Style Breakdown
+    // Detailed Breakdown
     businessInsights: {
+      performance: {
+        completedPlays,
+        playThroughRate,
+      },
+      storage: {
+        totalUsed: totalStorageUsed,
+      },
       subscriptions: {
         proCreators: subStats.proUsersCount,
         goPlusListeners: subStats.goPlusUsersCount,
@@ -118,8 +148,8 @@ exports.getTopTracksList = async (limit = 10) => {
 exports.getAllTracks = async (query) => {
   const { page = 1, limit = 20, search, genre, status, uploadDate } = query;
 
-  const safePage = Math.max(1, Number(page)); // 1. إنشاء الرقم الآمن
-  const skip = (safePage - 1) * Number(limit); // 2. استخدام الرقم الآمن هنا ✅
+  const safePage = Math.max(1, Number(page));
+  const skip = (safePage - 1) * Number(limit);
 
   let filter = {};
 

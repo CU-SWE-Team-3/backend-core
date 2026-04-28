@@ -3,12 +3,25 @@ const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
 const notificationService = require('./notificationService');
 const Follow = require('../models/followModel');
+const User = require('../models/userModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 
 // ==========================================
 // CREATE PLAYLIST
 // ==========================================
 exports.createPlaylist = async (userId, playlistData) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError('User not found.', 404);
+
+  if (user.subscriptionPlan === 'Free') {
+    const playlistCount = await Playlist.countDocuments({ creator: userId });
+    if (playlistCount >= 2) {
+      throw new AppError(
+        'Free accounts are limited to 2 playlists. Please upgrade to Pro to create more.',
+        403
+      );
+    }
+  }
   const playlist = new Playlist(playlistData);
   playlist.creator = userId;
 

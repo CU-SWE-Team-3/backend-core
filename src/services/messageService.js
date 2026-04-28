@@ -325,7 +325,6 @@ exports.getUserConversations = async (userId, page, limit) => {
       populate: {
         path: 'attachment.referenceId',
         select: 'title', // ONLY fetch the title for the inbox preview to keep it fast!
-        model: 'Track',
       },
     })
     .sort({ updatedAt: -1 })
@@ -390,8 +389,7 @@ exports.getConversationMessages = async (
     .limit(limit)
     .populate({
       path: 'attachment.referenceId',
-      select: 'title artworkUrl permalink duration waveform',
-      model: 'Track',
+      select: 'title artworkUrl permalink duration waveform trackCount',
     });
 
   return {
