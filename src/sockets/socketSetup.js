@@ -13,16 +13,35 @@ const initializeSockets = (server) => {
 
   io.use((socket, next) => {
     try {
-      const token =
-        socket.handshake.auth.token ||
-        socket.handshake.headers.authorization?.split(' ')[1];
-      if (!token) return next(new Error('Authentication error: No token'));
+      // 1. Check both locations
+      let token =
+        socket.handshake.auth?.token || socket.handshake.headers?.authorization;
 
+      if (!token) {
+        console.error('[SOCKET AUTH] Connection rejected: No token provided');
+        return next(new Error('Authentication error: No token'));
+      }
+
+      // 2. CRITICAL: Strip "Bearer " prefix regardless of which field it came from
+      if (token.startsWith('Bearer ')) {
+        token = token.split(' ')[1];
+      }
+
+      // 3. Verify using the same secret as REST
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.user = decoded;
+
+      // 4. Attach user data.
+      // Pro-tip: Match your REST middleware property name (e.g., decoded.id)
+      socket.user = {
+        id: decoded.id,
+        ...decoded,
+      };
+
       next();
     } catch (error) {
-      next(new Error('Authentication error: Invalid token'));
+      console.error(`[SOCKET AUTH] JWT Verification Failed: ${error.message}`);
+      // Send a specific message so mobile knows it's a token issue, not a server crash
+      next(new Error('Authentication error: Invalid or expired token'));
     }
   });
 
