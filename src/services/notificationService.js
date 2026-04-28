@@ -30,6 +30,7 @@ const processNotification = async ({
   targetId,
   targetModel,
   contentSnippet = null,
+  extraData = {},
 }) => {
   // Prevent self-notification (e.g., liking your own track)
   if (recipientId.toString() === actorId.toString()) return null;
@@ -349,7 +350,8 @@ exports.notifyMessage = async (
   recipientId,
   senderId,
   messageId,
-  messageText
+  messageText,
+  conversationId
 ) => {
   const safeMessageText = messageText || '';
   const snippet =
