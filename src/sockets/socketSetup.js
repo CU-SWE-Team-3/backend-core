@@ -11,33 +11,40 @@ const initializeSockets = (server) => {
     cors: { origin: process.env.FRONTEND_URL, credentials: true },
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
-      // 1. Check both locations
-      let token =
+      // 1. Grab the raw input
+      const rawToken =
         socket.handshake.auth?.token || socket.handshake.headers?.authorization;
 
-      if (!token) {
-        console.error('[SOCKET AUTH] Connection rejected: No token provided');
-        return next(new Error('Authentication error: No token'));
+      if (!rawToken) {
+        console.error(
+          '[SOCKET AUTH] No token found in handshake.auth or headers'
+        );
+        return next(new Error('Authentication error: No token provided'));
       }
 
-      // 2. CRITICAL: Strip "Bearer " prefix regardless of which field it came from
-      if (token.startsWith('Bearer ')) {
-        token = token.split(' ')[1];
-      }
+      // 2. Case-insensitive "Bearer " stripping (Fixes 'bearer' vs 'Bearer')
+      // This regex removes "Bearer " regardless of case or extra spaces
+      const token = rawToken.replace(/^Bearer\s+/i, '');
 
-      // 3. Verify using the same secret as REST
+      // 3. Verify with the secret
+      // IMPORTANT: Ensure process.env.JWT_SECRET is identical to the one in your REST service
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // 4. Attach user data.
+      // 4. Attach user
       socket.user = decoded;
 
+      console.log(`[SOCKET AUTH] Success: User ${decoded.id} connected`);
       next();
     } catch (error) {
-      console.error(`[SOCKET AUTH] JWT Verification Failed: ${error.message}`);
-      // Send a specific message so mobile knows it's a token issue, not a server crash
-      next(new Error('Authentication error: Invalid or expired token'));
+      // 5. CRITICAL: Log the EXACT error so you can see if it's 'invalid signature' or 'jwt malformed'
+      console.error(
+        `[SOCKET AUTH ERROR]: ${error.message} | Token snippet: ${socket.handshake.auth?.token?.substring(0, 10)}...`
+      );
+
+      // Return the actual error message to the mobile team so they can debug their side
+      return next(new Error(`Authentication error: ${error.message}`));
     }
   });
 
