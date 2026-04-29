@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/userModel');
 const AppError = require('../utils/appError');
+const sendEmail = require('../utils/sendEmail');
 
 exports.createStripeCheckout = async (user, planType) => {
   // 1. Guard check
@@ -108,6 +109,58 @@ exports.handleWebhook = async (rawBody, signature) => {
     console.log(
       `✅ [Stripe] Successfully upgraded User ${userId} to ${planType}`
     );
+  }
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object;
+
+    // We only care about recurring billing cycles here
+    if (invoice.billing_reason === 'subscription_cycle') {
+      const subscription = await stripe.subscriptions.retrieve(
+        invoice.subscription
+      );
+
+      await User.findOneAndUpdate(
+        { stripeSubscriptionId: invoice.subscription },
+        {
+          isPremium: true,
+          // Convert Stripe seconds to JS milliseconds
+          subscriptionExpiresAt: new Date(
+            subscription.current_period_end * 1000
+          ),
+          cancelAtPeriodEnd: false,
+        }
+      );
+      console.log(`✅ Subscription renewed for ${invoice.customer_email}`);
+    }
+  }
+
+  // B. Handle Payment Failure
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object;
+
+    // Revoke premium access immediately
+    const user = await User.findOneAndUpdate(
+      { stripeSubscriptionId: invoice.subscription },
+      { isPremium: false }
+    );
+
+    if (user) {
+      console.log(`❌ Payment failed for ${user.email}. Access revoked.`);
+
+      // 2. Trigger the Email
+      try {
+        await sendEmail({
+          email: user.email,
+          subject: 'Urgent: Payment for your Premium subscription failed',
+          message: `Hi ${user.name || 'there'},\n\nWe were unable to process your recurring payment for the ${user.subscriptionPlan} plan. Your premium access has been suspended. Please log in and update your payment method to restore your features.\n\nThank you!`,
+        });
+        console.log(`📧 Notification email sent to ${user.email}`);
+      } catch (err) {
+        console.error(
+          `Internal Error: Could not send failure email: ${err.message}`
+        );
+      }
+    }
   }
 };
 

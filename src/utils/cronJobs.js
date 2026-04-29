@@ -38,6 +38,7 @@ const startCronJobs = () => {
       const expiredUsers = await User.updateMany(
         {
           isPremium: true,
+          cancelAtPeriodEnd: true,
           subscriptionExpiresAt: { $lte: now },
         },
         {
@@ -63,34 +64,6 @@ const startCronJobs = () => {
     }
   });
 
-  cron.schedule('0 1 * * *', async () => {
-    try {
-      const expiredUsers = await User.updateMany(
-        {
-          cancelAtPeriodEnd: true,
-        },
-        {
-          $set: {
-            isPremium: false,
-            subscriptionPlan: 'Free',
-            mockStripeId: null,
-            subscriptionExpiresAt: null,
-            cancelAtPeriodEnd: false,
-          },
-        }
-      );
-      if (expiredUsers.modifiedCount > 0) {
-        console.log(
-          `[Cron] Demoted ${expiredUsers.modifiedCount} expired premium subscriptions.`
-        );
-      }
-    } catch (error) {
-      console.error(
-        '[Cron Error] Failed to process subscription expirations:',
-        error
-      );
-    }
-  });
   cron.schedule('0 * * * *', async () => {
     console.log('📉 Applying Gravity to Viral Scores...');
 
