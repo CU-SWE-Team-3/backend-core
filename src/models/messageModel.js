@@ -21,7 +21,7 @@ const messageSchema = new mongoose.Schema(
     attachment: {
       type: {
         type: String,
-        enum: ['track', 'playlist', null],
+        enum: ['Track', 'Playlist', null],
         default: null,
       },
       referenceId: {
