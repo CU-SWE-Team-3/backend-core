@@ -6,6 +6,8 @@ const Track = require('../models/trackModel');
 const AppError = require('../utils/appError');
 const { getIo, connectedUsers } = require('../sockets/socketSetup');
 const notificationService = require('./notificationService');
+const User = require('../models/userModel');
+const Follow = require('../models/followModel');
 
 const TIME_LIMIT_MS = 15 * 60 * 1000; // 15 Minutes
 
@@ -149,6 +151,25 @@ exports.sendMessage = async (
       'Cannot send message. You are blocked by this user.',
       403
     );
+  }
+
+  const receiverUser = await User.findById(receiverId).select(
+    'notificationSettings'
+  );
+  if (
+    receiverUser &&
+    receiverUser.notificationSettings?.messagePermission === 'Following'
+  ) {
+    const isFollowing = await Follow.exists({
+      follower: receiverId,
+      following: senderId,
+    });
+    if (!isFollowing) {
+      throw new AppError(
+        'This user only accepts messages from people they follow.',
+        403
+      );
+    }
   }
 
   //PRIVATE TRACK CHECK GOES HERE

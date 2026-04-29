@@ -51,13 +51,28 @@ const userSchema = new mongoose.Schema(
       },
     ],
     notificationSettings: {
-      pushEnabled: { type: Boolean, default: true }, // Global kill switch
+      pushEnabled: { type: Boolean, default: true },
       allowLikes: { type: Boolean, default: true },
       allowReposts: { type: Boolean, default: true },
       allowComments: { type: Boolean, default: true },
       allowFollows: { type: Boolean, default: true },
       allowMessages: { type: Boolean, default: true },
       allowNewTracks: { type: Boolean, default: true },
+      allowRecommended: { type: Boolean, default: true },
+      // Email channel toggles
+      emailLikes: { type: Boolean, default: true },
+      emailReposts: { type: Boolean, default: true },
+      emailComments: { type: Boolean, default: true },
+      emailFollows: { type: Boolean, default: true },
+      emailMessages: { type: Boolean, default: true },
+      emailNewTracks: { type: Boolean, default: true },
+      emailRecommended: { type: Boolean, default: true },
+      // Who can message you
+      messagePermission: {
+        type: String,
+        enum: ['Everyone', 'Following'],
+        default: 'Everyone',
+      },
     },
 
     password: {

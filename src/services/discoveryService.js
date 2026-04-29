@@ -72,7 +72,7 @@ exports.getRecommendedBasedOnLikes = async (userId) => {
     return exports.getTrendingTracks();
   }
 
-  return await Track.find({
+  const tracks = await Track.find({
     genre: { $in: likedGenres },
     _id: { $nin: likedTrackIds },
     isPublic: true,
@@ -85,6 +85,19 @@ exports.getRecommendedBasedOnLikes = async (userId) => {
     .sort({ playCount: -1 })
     .limit(15)
     .populate('artist', 'displayName avatarUrl permalink');
+
+  if (userId && tracks.length > 0) {
+    const notificationService = require('./notificationService');
+    const trackIds = tracks.slice(0, 3).map((t) => t._id);
+    notificationService.notifyRecommended(userId, trackIds).catch((err) => {
+      console.error(
+        '[Discovery] Failed to send recommended notification:',
+        err.message
+      );
+    });
+  }
+
+  return tracks;
 };
 
 exports.getStationByGenre = async (genre) => {

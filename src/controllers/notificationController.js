@@ -137,10 +137,22 @@ exports.removeFcmToken = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getPreferences = catchAsync(async (req, res, next) => {
+  const userId = (req.user && req.user.id) || req.user._id;
+  if (!userId) return next(new AppError('User ID is required', 400));
+
+  const settings = await notificationService.getPreferences(userId);
+
+  res.status(200).json({
+    success: true,
+    data: settings,
+  });
+});
+
 exports.updatePreferences = catchAsync(async (req, res, next) => {
   const userId = (req.user && req.user.id) || req.user._id;
+  if (!userId) return next(new AppError('User ID is required', 400));
 
-  // Pass the whole body, the service will safely filter it
   const updatedSettings = await notificationService.updatePreferences(
     userId,
     req.body

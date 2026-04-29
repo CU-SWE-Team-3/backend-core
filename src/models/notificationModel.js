@@ -34,6 +34,7 @@ const notificationSchema = new mongoose.Schema(
         'NEW_PLAYLIST',
         'MENTION',
         'SYSTEM',
+        'RECOMMENDED',
       ],
       required: true,
     },

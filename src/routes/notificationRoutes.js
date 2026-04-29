@@ -23,6 +23,8 @@ router.post('/fcm-token', protect, notificationController.registerFcmToken);
 router.delete('/fcm-token', protect, notificationController.removeFcmToken);
 
 // 5. DEVELOPER D: Notification Preferences
+router.get('/preferences', protect, notificationController.getPreferences);
+
 router.patch('/preferences', protect, notificationController.updatePreferences);
 
 // ==========================================

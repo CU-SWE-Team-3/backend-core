@@ -4,6 +4,7 @@ const { getIo } = require('../sockets/socketSetup');
 const User = require('../models/userModel'); // DEVELOPER D
 const firebaseService = require('./firebaseService'); // DEVELOPER D
 const AppError = require('../utils/appError');
+const sendEmail = require('../utils/sendEmail');
 
 /**
  * Helper to emit events via Socket.IO.
@@ -85,84 +86,189 @@ const processNotification = async ({
     );
 
     // If no user, or global push is disabled, or no devices are registered -> Abort Push
-    if (
-      !recipient ||
-      !recipient.notificationSettings?.pushEnabled ||
-      !recipient.fcmTokens?.length
-    ) {
+    // if (
+    //   !recipient ||
+    //   !recipient.notificationSettings?.pushEnabled ||
+    //   !recipient.fcmTokens?.length
+    // ) {
+    //   return populatedNotification;
+    // }
+
+    if (!recipient) {
       return populatedNotification;
     }
+    const settings = recipient.notificationSettings || {};
 
-    const settings = recipient.notificationSettings;
-    const actorName = populatedNotification.actors[0]?.displayName || 'Someone';
+    if (settings.pushEnabled !== false && recipient.fcmTokens?.length) {
+      const actorName =
+        populatedNotification.actors[0]?.displayName || 'Someone';
 
-    let pushTitle = '';
-    let pushBody = '';
-    let shouldPush = false;
+      let pushTitle = '';
+      let pushBody = '';
+      let shouldPush = false;
 
-    switch (type) {
-      case 'LIKE':
-        if (settings.allowLikes) {
+      switch (type) {
+        case 'LIKE':
+          if (settings.allowLikes) {
+            shouldPush = true;
+            pushTitle = 'New Like';
+            pushBody = `${actorName} liked your ${targetModel.toLowerCase()}`;
+          }
+          break;
+        case 'REPOST':
+          if (settings.allowReposts) {
+            shouldPush = true;
+            pushTitle = 'New Repost';
+            pushBody = `${actorName} reposted your ${targetModel.toLowerCase()}`;
+          }
+          break;
+        case 'COMMENT':
+          if (settings.allowComments) {
+            shouldPush = true;
+            pushTitle = 'New Comment';
+            pushBody = `${actorName} commented: "${contentSnippet}"`;
+          }
+          break;
+        case 'FOLLOW':
+          if (settings.allowFollows) {
+            shouldPush = true;
+            pushTitle = 'New Follower';
+            pushBody = `${actorName} started following you`;
+          }
+          break;
+        case 'MESSAGE':
+          if (settings.allowMessages) {
+            shouldPush = true;
+            pushTitle = `Message from ${actorName}`;
+            pushBody = contentSnippet;
+          }
+          break;
+        case 'NEW_TRACK':
+          if (settings.allowNewTracks) {
+            shouldPush = true;
+            pushTitle = 'New Track Alert';
+            pushBody = `${actorName} just uploaded a new track!`;
+          }
+          break;
+        case 'NEW_PLAYLIST':
+          if (settings.allowNewTracks !== false) {
+            shouldPush = true;
+            pushTitle = 'New Playlist Alert';
+            pushBody = `${actorName} just released a new playlist!`;
+          }
+          break;
+        case 'RECOMMENDED':
+          if (settings.allowRecommended !== false) {
+            shouldPush = true;
+            pushTitle = 'Recommended for you';
+            pushBody = contentSnippet || 'We found new tracks you might love!';
+          }
+          break;
+        case 'MENTION':
           shouldPush = true;
-          pushTitle = 'New Like';
-          pushBody = `${actorName} liked your ${targetModel.toLowerCase()}`;
-        }
-        break;
-      case 'REPOST':
-        if (settings.allowReposts) {
+          pushTitle = 'You were mentioned';
+          pushBody = contentSnippet || 'Someone mentioned you in a comment';
+          break;
+        case 'SYSTEM':
           shouldPush = true;
-          pushTitle = 'New Repost';
-          pushBody = `${actorName} reposted your ${targetModel.toLowerCase()}`;
-        }
-        break;
-      case 'COMMENT':
-        if (settings.allowComments) {
-          shouldPush = true;
-          pushTitle = 'New Comment';
-          pushBody = `${actorName} commented: "${contentSnippet}"`;
-        }
-        break;
-      case 'FOLLOW':
-        if (settings.allowFollows) {
-          shouldPush = true;
-          pushTitle = 'New Follower';
-          pushBody = `${actorName} started following you`;
-        }
-        break;
-      case 'MESSAGE':
-        if (settings.allowMessages) {
-          shouldPush = true;
-          pushTitle = `Message from ${actorName}`;
-          pushBody = contentSnippet;
-        }
-        break;
-      case 'NEW_TRACK':
-        if (settings.allowNewTracks) {
-          shouldPush = true;
-          pushTitle = 'New Track Alert';
-          pushBody = `${actorName} just uploaded a new track!`;
-        }
-        break;
-      case 'MENTION':
-      case 'SYSTEM':
-        shouldPush = true;
-        pushTitle = type === 'SYSTEM' ? 'BioBeats Alert' : 'You were mentioned';
-        pushBody = contentSnippet || `You have a new ${type.toLowerCase()}`;
-        break;
+          pushTitle = 'BioBeats Alert';
+          pushBody = contentSnippet || 'You have a new system notification';
+          break;
+      }
+      if (shouldPush) {
+        await firebaseService.sendPushNotification(
+          recipient.fcmTokens,
+          pushTitle,
+          pushBody,
+          {
+            notificationId: populatedNotification._id.toString(),
+            type: type,
+            targetId: targetId ? targetId.toString() : '',
+            ...extraData,
+          }
+        );
+      }
     }
+    const emailMap = {
+      LIKE: 'emailLikes',
+      REPOST: 'emailReposts',
+      COMMENT: 'emailComments',
+      FOLLOW: 'emailFollows',
+      MESSAGE: 'emailMessages',
+      NEW_TRACK: 'emailNewTracks',
+      NEW_PLAYLIST: 'emailNewTracks',
+      RECOMMENDED: 'emailRecommended',
 
-    if (shouldPush) {
-      await firebaseService.sendPushNotification(
-        recipient.fcmTokens,
-        pushTitle,
-        pushBody,
-        {
-          notificationId: populatedNotification._id.toString(),
-          type: type,
-          targetId: targetId ? targetId.toString() : '',
-          ...extraData,
+      MENTION: null, // no email for mentions
+      SYSTEM: null, // system emails handled separately (admin broadcast)
+    };
+
+    const emailSettingKey = emailMap[type];
+    const shouldEmail = emailSettingKey
+      ? settings[emailSettingKey] !== false
+      : false;
+
+    if (shouldEmail) {
+      const recipientUser =
+        await User.findById(recipientId).select('email displayName');
+      if (recipientUser && recipientUser.email) {
+        // Build email subject & message per type
+        const actorName =
+          populatedNotification.actors[0]?.displayName || 'Someone';
+
+        let emailSubject = '';
+        let emailMessage = '';
+
+        switch (type) {
+          case 'LIKE':
+            emailSubject = 'Someone liked your track on BioBeats';
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} liked your ${targetModel.toLowerCase()}.\n\nCheck it out on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'REPOST':
+            emailSubject = 'Someone reposted your track on BioBeats';
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} reposted your ${targetModel.toLowerCase()}.\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'COMMENT':
+            emailSubject = 'New comment on your track';
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} commented: "${contentSnippet}"\n\nReply on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'FOLLOW':
+            emailSubject = 'You have a new follower on BioBeats';
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} started following you.\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'MESSAGE':
+            emailSubject = `New message from ${actorName}`;
+            emailMessage = `Hi ${recipientUser.displayName},\n\nYou have a new message from ${actorName}:\n\nReply on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'NEW_TRACK':
+            emailSubject = `${actorName} just uploaded a new track`;
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} just uploaded a new track. Check it out on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'NEW_PLAYLIST':
+            emailSubject = `${actorName} just released a new playlist`;
+            emailMessage = `Hi ${recipientUser.displayName},\n\n${actorName} just released a new playlist. Check it out on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
+          case 'RECOMMENDED':
+            emailSubject = 'New tracks recommended for you on BioBeats';
+            emailMessage = `Hi ${recipientUser.displayName},\n\nWe found some new tracks we think you'll love based on your listening history.\n\nCheck them out on BioBeats!\n\nRegards,\nThe BioBeats Team`;
+            break;
         }
-      );
+
+        if (emailSubject) {
+          try {
+            await sendEmail({
+              email: recipientUser.email,
+              subject: emailSubject,
+              message: emailMessage,
+            });
+            console.log(
+              `[Notification Email] Sent ${type} email to ${recipientUser.email}`
+            );
+          } catch (emailError) {
+            console.error('[Notification Email Error]', emailError.message);
+          }
+        }
+      }
     }
 
     return populatedNotification;
@@ -420,6 +526,60 @@ exports.notifyMention = async (recipientId, actorId, trackId) => {
   }
 };
 
+exports.notifyRecommended = async (userId, trackIds = []) => {
+  try {
+    const trackList = trackIds.slice(0, 3); // show max 3 track titles
+    const snippet =
+      trackList.length > 0
+        ? `Check out these new tracks we picked for you!`
+        : `We found new tracks you might love!`;
+
+    const notification = await Notification.create({
+      recipient: userId,
+      type: 'RECOMMENDED',
+      actors: [],
+      actorCount: 0,
+      target: trackList[0] || null,
+      targetModel: trackList[0] ? 'Track' : null,
+      contentSnippet: snippet,
+      isRead: false,
+    });
+
+    // emit socket
+    emitRealTimeNotification(userId, notification);
+
+    // check email preference
+    const recipient = await User.findById(userId).select(
+      'email displayName notificationSettings'
+    );
+
+    if (
+      recipient &&
+      recipient.notificationSettings?.emailRecommended !== false &&
+      recipient.email
+    ) {
+      try {
+        await sendEmail({
+          email: recipient.email,
+          subject: 'New tracks recommended for you on BioBeats',
+          message: `Hi ${recipient.displayName},\n\nWe found some new tracks we think you'll love based on your listening history.\n\nCheck them out on BioBeats!\n\nRegards,\nThe BioBeats Team`,
+        });
+        console.log(`[Recommendation Email] Sent to ${recipient.email}`);
+      } catch (emailError) {
+        console.error('[Recommendation Email Error]', emailError.message);
+      }
+    }
+
+    return notification;
+  } catch (error) {
+    console.error(
+      '[Notification Service] Failed to create RECOMMENDED notification:',
+      error
+    );
+    return null;
+  }
+};
+
 exports.notifySystem = async (recipientId, messageText, actionLink = null) => {
   try {
     const notificationPayload = {
@@ -500,7 +660,6 @@ exports.updatePreferences = async (userId, preferences) => {
   const user = await User.findById(userId);
   if (!user) throw new AppError('User not found', 404);
 
-  // List of allowed fields so users can't inject random data into your DB
   const allowedFields = [
     'pushEnabled',
     'allowLikes',
@@ -509,9 +668,17 @@ exports.updatePreferences = async (userId, preferences) => {
     'allowFollows',
     'allowMessages',
     'allowNewTracks',
+    'allowRecommended',
+    'emailLikes',
+    'emailReposts',
+    'emailComments',
+    'emailFollows',
+    'emailMessages',
+    'emailNewTracks',
+    'emailRecommended',
+    'messagePermission',
   ];
 
-  // Loop through allowed fields and update if provided
   allowedFields.forEach((field) => {
     if (preferences[field] !== undefined) {
       user.notificationSettings[field] = preferences[field];
@@ -519,5 +686,11 @@ exports.updatePreferences = async (userId, preferences) => {
   });
 
   await user.save({ validateModifiedOnly: true });
+  return user.notificationSettings;
+};
+
+exports.getPreferences = async (userId) => {
+  const user = await User.findById(userId).select('notificationSettings');
+  if (!user) throw new AppError('User not found', 404);
   return user.notificationSettings;
 };
