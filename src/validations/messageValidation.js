@@ -14,7 +14,7 @@ exports.sendMessageSchema = {
     attachmentType: {
       required: false,
       type: 'string',
-      enum: ['track', 'playlist'],
+      enum: ['Track', 'Playlist'],
       enumMessage: 'Attachment type must be either track or playlist.',
     },
     attachmentId: {
