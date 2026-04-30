@@ -2,6 +2,8 @@ const cron = require('node-cron');
 const Track = require('../models/trackModel');
 const AppError = require('./appError');
 const User = require('../models/userModel');
+const discoveryService = require('../services/discoveryService');
+const notificationService = require('../services/notificationService');
 
 const startCronJobs = () => {
   // --------------------------------------------------------
@@ -75,6 +77,47 @@ const startCronJobs = () => {
       );
     } catch (error) {
       console.error('Gravity Job Failed:', error);
+    }
+  });
+  cron.schedule('0 10 * * 5', async () => {
+    console.log('[Cron] Starting Weekly Recommendations blast...');
+    try {
+      const users = await User.find({
+        'notificationSettings.emailRecommended': { $ne: false },
+      }).select('_id');
+
+      let sentCount = 0;
+      const batchSize = 50;
+
+      for (let i = 0; i < users.length; i += batchSize) {
+        const batch = users.slice(i, i + batchSize);
+
+        // We intentionally await in this loop to process batches sequentially.
+        // eslint-disable-next-line no-await-in-loop
+        const results = await Promise.all(
+          batch.map(async (user) => {
+            const tracks = await discoveryService.getRecommendedBasedOnLikes(
+              user._id
+            );
+
+            if (tracks && tracks.length > 0) {
+              const trackIds = tracks.slice(0, 3).map((t) => t._id);
+              await notificationService.notifyRecommended(user._id, trackIds);
+              return true;
+            }
+            return false;
+          })
+        );
+
+        sentCount += results.filter(Boolean).length;
+      }
+
+      console.log(`[Cron] Weekly recommendations sent to ${sentCount} users.`);
+    } catch (error) {
+      console.error(
+        '[Cron Error] Failed to process weekly recommendations:',
+        error
+      );
     }
   });
 };

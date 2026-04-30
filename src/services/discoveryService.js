@@ -86,17 +86,6 @@ exports.getRecommendedBasedOnLikes = async (userId) => {
     .limit(15)
     .populate('artist', 'displayName avatarUrl permalink');
 
-  if (userId && tracks.length > 0) {
-    const notificationService = require('./notificationService');
-    const trackIds = tracks.slice(0, 3).map((t) => t._id);
-    notificationService.notifyRecommended(userId, trackIds).catch((err) => {
-      console.error(
-        '[Discovery] Failed to send recommended notification:',
-        err.message
-      );
-    });
-  }
-
   return tracks;
 };
 
