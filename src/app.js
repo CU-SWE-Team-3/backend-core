@@ -9,8 +9,9 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const subscriptionController = require('./controllers/subscriptionController');
 const networkRoutes = require('./routes/networkRoutes');
-const messageRoutes = require('./routes/messageRoutes'); // <--- NEW: Import message routes
+const messageRoutes = require('./routes/messageRoutes');
 const historyRouter = require('./routes/historyRoutes');
+const stationRoutes = require('./routes/stationRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const feedRoutes = require('./routes/feedRoutes');
 
@@ -127,7 +128,7 @@ app.use('/api/network', networkRoutes);
 app.use('/api/profile', profileRoutes);
 
 app.use('/api/tracks', trackRoutes);
-
+app.use('/api/stations', stationRoutes);
 app.use('/api/player', playerRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/comments', commentRoutes);
