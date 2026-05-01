@@ -22,6 +22,7 @@ exports.updateProgress = catchAsync(async (req, res, next) => {
   );
 
   res.status(200).json({
+    success: true,
     status: 'success',
     data: { history: historyRecord },
   });

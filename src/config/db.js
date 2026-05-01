@@ -10,7 +10,9 @@ const connectDB = async () => {
     );
 
     // 2. Connect to MongoDB
-    await mongoose.connect(DB);
+    await mongoose.connect(DB, {
+      autoIndex: process.env.NODE_ENV !== 'production',
+    });
     console.log('✅ Connected to MongoDB successfully.');
   } catch (error) {
     const appError = new AppError(

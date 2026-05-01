@@ -6,6 +6,9 @@ const User = require('../models/userModel');
 const sendEmail = require('../utils/sendEmail');
 const AppError = require('../utils/appError');
 
+const recentlyRotated = new Map(); // oldToken -> { newToken, newRefreshToken, user, expiresAt }
+const GRACE_WINDOW_MS = 10000;
+
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -23,18 +26,33 @@ const generateTokens = async (user) => {
   return { token, refreshToken };
 };
 
+// Purge expired grace entries periodically to prevent memory growth.
+setInterval(() => {
+  const now = Date.now();
+  Array.from(recentlyRotated.entries()).forEach(([key, val]) => {
+    if (val.expiresAt < now) recentlyRotated.delete(key);
+  });
+}, 60000);
+
 const verifyRefreshToken = async (incomingRefreshToken) => {
   try {
-    // 1. Verify the token (this throws an error if expired or tampered with)
+    // Check grace window first — concurrent requests carrying the old token succeed.
+    const cached = recentlyRotated.get(incomingRefreshToken);
+    if (cached && cached.expiresAt > Date.now()) {
+      return {
+        token: cached.newToken,
+        refreshToken: cached.newRefreshToken,
+        user: cached.user,
+      };
+    }
+
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.JWT_REFRESH_SECRET
     );
 
-    // 2. Find the user
     const user = await User.findById(decoded.id);
 
-    // 3. Check if user exists AND if the token matches the one in the DB
     if (!user || user.refreshToken !== incomingRefreshToken) {
       throw new AppError(
         'Invalid or revoked refresh token. Please log in again.',
@@ -42,17 +60,22 @@ const verifyRefreshToken = async (incomingRefreshToken) => {
       );
     }
 
-    // 4. Generate new tokens
     const { token, refreshToken } = await generateTokens(user);
+
+    // Cache the mapping so concurrent requests with the same old token succeed.
+    recentlyRotated.set(incomingRefreshToken, {
+      newToken: token,
+      newRefreshToken: refreshToken,
+      user,
+      expiresAt: Date.now() + GRACE_WINDOW_MS,
+    });
 
     return { token, refreshToken, user };
   } catch (error) {
-    // CRITICAL FIX: If the error is ALREADY an AppError (like the one we threw in step 3), re-throw it so we don't lose the status code!
     if (error.isOperational) {
       throw error;
     }
 
-    // Otherwise, it was a JWT error (like TokenExpiredError), so we throw a 401 AppError
     throw new AppError(
       'Unauthorized: Token is invalid or expired. Please log in again.',
       401
@@ -198,12 +221,9 @@ const generatePasswordReset = async (email) => {
       message,
     });
   } catch (err) {
+    // Log the SMTP failure but do NOT wipe the reset token and do NOT throw.
+    // The user can still use the token if they received the email before the SMTP error.
     console.error('Email delivery failed:', err.message);
-    // If email fails, wipe the token so they can try again
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
-    throw new AppError('Email could not be sent. Please try again later.', 500);
   }
 
   return { user, resetToken };

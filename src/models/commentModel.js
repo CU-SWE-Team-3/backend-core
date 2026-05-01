@@ -41,6 +41,7 @@ const commentSchema = new mongoose.Schema(
 
 // Indexes for fast retrieval of a track's comments, sorted by timestamp on the waveform
 commentSchema.index({ track: 1, timestamp: 1 });
+commentSchema.index({ track: 1, parentComment: 1, timestamp: 1 });
 
 // Virtual populate for 1-level deep replies
 commentSchema.virtual('replies', {

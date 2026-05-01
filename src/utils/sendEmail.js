@@ -1,17 +1,28 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async (options) => {
-  // 1. Create a transporter (You will add these variables to your .env file)
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    auth: {
-      user: process.env.EMAIL_USERNAME,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
+// Create ONE pooled transporter at module load time — reused across all requests.
+// pool:true tells nodemailer to keep connections open rather than open/close per send.
+// maxConnections:5 prevents Gmail from seeing a burst of 50+ simultaneous logins.
+let transporter;
 
-  // 2. Define the email options
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT,
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      auth: {
+        user: process.env.EMAIL_USERNAME,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+  }
+  return transporter;
+};
+
+const sendEmail = async (options) => {
   const mailOptions = {
     from: `BioBeats Support <${process.env.EMAIL_USERNAME}>`,
     to: options.email,
@@ -19,8 +30,7 @@ const sendEmail = async (options) => {
     text: options.message,
   };
 
-  // 3. Actually send the email
-  await transporter.sendMail(mailOptions);
+  await getTransporter().sendMail(mailOptions);
 };
 
 module.exports = sendEmail;

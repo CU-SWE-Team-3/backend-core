@@ -7,11 +7,14 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   const senderId = req.user._id;
   const { receiverId, content, attachmentType, attachmentId } = req.body;
 
+  if (!receiverId) {
+    return next(new AppError('receiverId is required.', 400));
+  }
+
   if (senderId.toString() === receiverId.toString()) {
     return next(new AppError('You cannot send a message to yourself.', 400));
   }
 
-  // Validate that at least text OR an attachment is sent
   if (!content && !attachmentType) {
     return next(
       new AppError(

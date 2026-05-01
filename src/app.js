@@ -123,10 +123,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/network', networkRoutes);
-
 app.use('/api/profile', profileRoutes);
-
+app.use('/api/network', networkRoutes);
 app.use('/api/tracks', trackRoutes);
 app.use('/api/stations', stationRoutes);
 app.use('/api/player', playerRoutes);

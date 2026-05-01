@@ -1,4 +1,5 @@
 // src/services/messageService.js
+const mongoose = require('mongoose');
 const Conversation = require('../models/conversationModel');
 const Message = require('../models/messageModel');
 const Block = require('../models/blockModel');
@@ -141,10 +142,17 @@ exports.sendMessage = async (
   _io,
   attachment = null
 ) => {
+  const senderObjId = mongoose.Types.ObjectId.isValid(senderId)
+    ? new mongoose.Types.ObjectId(senderId)
+    : senderId;
+  const receiverObjId = mongoose.Types.ObjectId.isValid(receiverId)
+    ? new mongoose.Types.ObjectId(receiverId)
+    : receiverId;
+
   // 1. CORRECTED: Check Status / Blocking Rules using your Block collection
   const isBlocked = await Block.exists({
-    blocker: receiverId,
-    blocked: senderId,
+    blocker: receiverObjId,
+    blocked: senderObjId,
   });
   if (isBlocked) {
     throw new AppError(
@@ -156,12 +164,17 @@ exports.sendMessage = async (
   const receiverUser = await User.findById(receiverId).select(
     'notificationSettings'
   );
-  if (
-    receiverUser &&
-    receiverUser.notificationSettings?.messagePermission === 'Following'
-  ) {
+
+  // If the receiver account no longer exists, fail gracefully.
+  if (!receiverUser) {
+    throw new AppError('The recipient user was not found.', 404);
+  }
+
+  // messagePermission 'Following' means the receiver only accepts messages
+  // from people THEY follow — i.e. receiver is the follower, sender is following.
+  if (receiverUser.notificationSettings?.messagePermission === 'Following') {
     const isFollowing = await Follow.exists({
-      follower: receiverId,
+      follower: receiverId, // receiver follows sender
       following: senderId,
     });
     if (!isFollowing) {

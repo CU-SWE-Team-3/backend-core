@@ -40,6 +40,7 @@ const feedItemSchema = new mongoose.Schema({
 });
 
 feedItemSchema.index({ ownerId: 1, activityDate: -1 });
+feedItemSchema.index({ actorId: 1, activityType: 1, targetId: 1 });
 
 const FeedItem = mongoose.model('FeedItem', feedItemSchema);
 module.exports = FeedItem;

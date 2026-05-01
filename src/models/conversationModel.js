@@ -31,5 +31,6 @@ const conversationSchema = new mongoose.Schema(
 
 // Ensure fast lookups for user conversations
 conversationSchema.index({ participants: 1 });
+conversationSchema.index({ participants: 1, updatedAt: -1 });
 
 module.exports = mongoose.model('Conversation', conversationSchema);

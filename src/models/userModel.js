@@ -257,5 +257,7 @@ userSchema.index(
   { displayName: 'text', permalink: 'text' },
   { weights: { displayName: 5, permalink: 3 }, name: 'UserTextIndex' }
 );
+userSchema.index({ accountStatus: 1, followerCount: -1 });
+userSchema.index({ lastActiveAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);

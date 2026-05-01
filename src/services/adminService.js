@@ -1,4 +1,5 @@
 // src/services/adminService.js
+const mongoose = require('mongoose');
 const User = require('../models/userModel');
 const Track = require('../models/trackModel');
 const ListenHistory = require('../models/listenHistoryModel');
@@ -376,12 +377,32 @@ exports.getPendingReports = async (page = 1, limit = 20) => {
   const safePage = Math.max(1, Number(page));
   const skip = (safePage - 1) * Number(limit);
 
-  return await Report.find({ status: 'Pending' })
+  const reports = await Report.find({ status: 'Pending' })
     .populate('reporter', 'displayName permalink')
-    .populate('targetId')
     .skip(skip)
     .limit(Number(limit))
-    .sort('-createdAt');
+    .sort('-createdAt')
+    .lean();
+
+  // Safely populate targetId only when targetModel is a known valid ref
+  const validModels = ['Track', 'Comment', 'User'];
+  await Promise.all(
+    reports.map(async (report) => {
+      if (!report.targetModel || !validModels.includes(report.targetModel)) {
+        report.targetId = null;
+        return;
+      }
+      try {
+        const Model = mongoose.model(report.targetModel);
+        report.targetId =
+          (await Model.findById(report.targetId).lean()) || null;
+      } catch (error) {
+        report.targetId = null;
+      }
+    })
+  );
+
+  return reports;
 };
 
 exports.updateReportStatus = async (reportId, status) => {

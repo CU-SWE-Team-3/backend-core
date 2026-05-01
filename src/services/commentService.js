@@ -20,10 +20,12 @@ exports.addComment = async (
   }
   // ---> NEW TRUST & SAFETY CHECK (Using Block Model) <---
   // Check if either user has blocked the other
+  const artistId = track.artist?._id || track.artist;
+
   const blockRecord = await Block.findOne({
     $or: [
-      { blocker: track.artist, blocked: userId }, // The Artist blocked the Commenter/Liker
-      { blocker: userId, blocked: track.artist }, // The Commenter/Liker blocked the Artist
+      { blocker: artistId, blocked: userId },
+      { blocker: userId, blocked: artistId },
     ],
   });
 

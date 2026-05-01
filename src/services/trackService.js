@@ -24,7 +24,6 @@ const AppError = require('../utils/appError');
  * Updates track metadata (title, description, genre, tags, releaseDate)
  */
 exports.updateTrackMetadata = async (trackId, user, metadataBody) => {
-  const allowedUpdates = {};
   const allowedFields = [
     'title',
     'description',
@@ -53,42 +52,43 @@ exports.updateTrackMetadata = async (trackId, user, metadataBody) => {
     'previewEndTime',
   ];
 
+  const allowedUpdates = {};
   allowedFields.forEach((field) => {
     if (metadataBody[field] !== undefined) {
       allowedUpdates[field] = metadataBody[field];
     }
   });
 
-  // ARTIST PRO CHECK: Scheduled Release Logic
+  // Step 1: find the track first so we can give the right error code.
+  const track = await Track.findById(trackId);
+  if (!track) {
+    throw new AppError('Track not found', 404);
+  }
+
+  // Step 2: ownership check — use toString() to avoid ObjectId type mismatch.
+  if (track.artist.toString() !== user._id.toString()) {
+    throw new AppError('You do not have permission to edit this track', 403);
+  }
+
+  // Step 3: scheduled release check.
   if (allowedUpdates.releaseDate) {
     const scheduledDate = new Date(allowedUpdates.releaseDate);
-    const now = new Date();
-
-    if (scheduledDate > now) {
-      // STRICT SEPARATION: Only 'Pro' users can schedule future releases
-      if (user.subscriptionPlan !== 'Pro') {
-        throw new AppError(
-          'Scheduling a future release requires an Artist Pro subscription.',
-          403
-        );
-      }
+    if (scheduledDate > new Date() && user.subscriptionPlan !== 'Pro') {
+      throw new AppError(
+        'Scheduling a future release requires an Artist Pro subscription.',
+        403
+      );
     }
   }
 
-  const track = await Track.findOneAndUpdate(
-    { _id: trackId, artist: user._id },
+  // Step 4: apply the update atomically.
+  const updated = await Track.findByIdAndUpdate(
+    trackId,
     { $set: allowedUpdates },
     { new: true, runValidators: true }
   );
 
-  if (!track) {
-    throw new AppError(
-      'Track not found or you do not have permission to edit it',
-      404
-    );
-  }
-
-  return track;
+  return updated;
 };
 
 exports.getMyTracks = async (userId) => {

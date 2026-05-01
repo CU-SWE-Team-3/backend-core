@@ -91,6 +91,7 @@ notificationSchema.index({ recipient: 1, updatedAt: -1 });
 // 30 days = 2,592,000 seconds
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
 
+notificationSchema.index({ recipient: 1, isRead: 1, updatedAt: -1 });
 // ==========================================
 // MODEL COMPILATION
 // (Must happen AFTER indexes are defined)
