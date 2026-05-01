@@ -37,13 +37,14 @@ exports.updatePrivacy = async (userId, isPrivate) => {
 };
 
 exports.updateSocialLinks = async (userId, socialLinks) => {
-  const user = await User.findById(userId).select('socialLinks');
+  // Read current links first just for the "no changes" check — this is read-only.
+  const current = await User.findById(userId).select('socialLinks').lean();
 
-  if (!user) {
+  if (!current) {
     throw new AppError('User not found', 404);
   }
 
-  const currentLinks = user.socialLinks.map((link) => ({
+  const currentLinks = current.socialLinks.map((link) => ({
     platform: link.platform,
     url: link.url,
   }));
@@ -58,10 +59,19 @@ exports.updateSocialLinks = async (userId, socialLinks) => {
     );
   }
 
-  user.socialLinks = socialLinks;
-  await user.save({ validateModifiedOnly: true });
+  // Atomic single-query update — replaces the two-step findById + save pattern
+  // that caused write conflicts under concurrent load.
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    { $set: { socialLinks } },
+    { new: true, runValidators: true }
+  ).select('socialLinks');
 
-  return { socialLinks: user.socialLinks };
+  if (!updated) {
+    throw new AppError('User not found', 404);
+  }
+
+  return { socialLinks: updated.socialLinks };
 };
 
 exports.removeSocialLink = async (userId, linkId) => {

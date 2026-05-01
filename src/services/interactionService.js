@@ -70,7 +70,6 @@ exports.addRepost = async (userId, targetId, targetModel = 'Track') => {
  * Removes a repost for a user on a specific track or playlist
  */
 exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
-  // 1. DYNAMIC MODEL SELECTION
   const Model = targetModel === 'Playlist' ? Playlist : Track;
 
   const entity = await Model.findById(targetId);
@@ -78,30 +77,30 @@ exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
     throw new AppError(`${targetModel} not found`, 404);
   }
 
-  const existingInteraction = await Interaction.findOne({
+  // Atomic findOneAndDelete — avoids the race condition of findOne + findByIdAndDelete.
+  // If two concurrent requests both attempt this, only one gets the document;
+  // the other gets null which we treat as "already removed" (idempotent 400).
+  const deleted = await Interaction.findOneAndDelete({
     actorId: userId,
     targetId: targetId,
     actionType: 'REPOST',
   });
 
-  if (!existingInteraction) {
+  if (!deleted) {
     throw new AppError(
       `You have not reposted this ${targetModel.toLowerCase()}`,
       400
     );
   }
 
-  // Delete interaction and decrement counter dynamically
-  await Interaction.findByIdAndDelete(existingInteraction._id);
   await Model.findByIdAndUpdate(targetId, [
     {
       $set: {
         repostCount: { $max: [0, { $subtract: ['$repostCount', 1] }] },
-        viralScore: { $max: [0, { $subtract: ['$viralScore', 10] }] }, // Subtract the 10 points
+        viralScore: { $max: [0, { $subtract: ['$viralScore', 10] }] },
       },
     },
   ]);
-  // Cleanup the feed
   await FeedItem.deleteMany({
     actorId: userId,
     activityType: 'REPOST',
@@ -109,7 +108,6 @@ exports.removeRepost = async (userId, targetId, targetModel = 'Track') => {
     targetModel: targetModel,
   });
 
-  // 👈 ADDED: Retract Notification
   const ownerId = entity.artist || entity.creator;
   notificationService.retractNotification(ownerId, userId, 'REPOST', targetId);
 
@@ -350,14 +348,6 @@ exports.addLike = async (userId, targetId, targetModel = 'Track') => {
   const ownerId = entity.artist || entity.creator;
   notificationService.notifyLike(ownerId, userId, targetId, targetModel);
 
-  // Publish Polymorphic Data to RabbitMQ
-  await publishToQueue('feed_fanout_queue_v3', {
-    actorId: userId,
-    activityType: 'LIKE',
-    targetId: targetId,
-    targetModel: targetModel,
-  });
-
   return {
     liked: true,
     newLikeCount: updatedEntity.likeCount,
@@ -367,7 +357,6 @@ exports.addLike = async (userId, targetId, targetModel = 'Track') => {
  * Removes a like for a user on a specific track or playlist
  */
 exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
-  // 1. DYNAMIC MODEL SELECTION
   const Model = targetModel === 'Playlist' ? Playlist : Track;
 
   const entity = await Model.findById(targetId);
@@ -375,31 +364,28 @@ exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
     throw new AppError(`${targetModel} not found`, 404);
   }
 
-  const existingInteraction = await Interaction.findOne({
+  // Atomic findOneAndDelete — race-safe.
+  const deleted = await Interaction.findOneAndDelete({
     actorId: userId,
     targetId: targetId,
     actionType: 'LIKE',
   });
 
-  if (!existingInteraction) {
+  if (!deleted) {
     throw new AppError(
       `You have not liked this ${targetModel.toLowerCase()}`,
       400
     );
   }
 
-  // Delete interaction and decrement counter dynamically
-  await Interaction.findByIdAndDelete(existingInteraction._id);
   await Model.findByIdAndUpdate(targetId, [
-    // 👈 Array brackets for pipeline
     {
       $set: {
         likeCount: { $max: [0, { $subtract: ['$likeCount', 1] }] },
-        viralScore: { $max: [0, { $subtract: ['$viralScore', 3] }] }, // Subtract the 3 points
+        viralScore: { $max: [0, { $subtract: ['$viralScore', 3] }] },
       },
     },
   ]);
-  // Cleanup the feed
   await FeedItem.deleteMany({
     actorId: userId,
     activityType: 'LIKE',
@@ -407,7 +393,6 @@ exports.removeLike = async (userId, targetId, targetModel = 'Track') => {
     targetModel: targetModel,
   });
 
-  // 👈 ADDED: Retract Notification
   const ownerId = entity.artist || entity.creator;
   notificationService.retractNotification(ownerId, userId, 'LIKE', targetId);
 

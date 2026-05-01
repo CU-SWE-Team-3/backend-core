@@ -18,6 +18,7 @@ exports.getPlayerState = catchAsync(async (req, res, next) => {
   const state = await playerService.getPlayerState(req.user.id);
 
   res.status(200).json({
+    success: true,
     status: 'success',
     data: state,
   });
@@ -27,6 +28,7 @@ exports.updatePlayerState = catchAsync(async (req, res, next) => {
   const state = await playerService.updatePlayerState(req.user.id, req.body);
 
   res.status(200).json({
+    success: true,
     status: 'success',
     data: state,
   });

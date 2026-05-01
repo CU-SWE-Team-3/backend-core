@@ -34,15 +34,17 @@ exports.followUser = async (followerId, followingId) => {
   }
   // ==========================================
 
-  const existingFollow = await Follow.findOne({
-    follower: followerId,
-    following: followingId,
-  });
+  const result = await Follow.updateOne(
+    { follower: followerId, following: followingId },
+    { $setOnInsert: { follower: followerId, following: followingId } },
+    { upsert: true }
+  );
 
-  if (existingFollow)
+  // If no new document was inserted, the follow already existed.
+  if (!result.upsertedCount) {
     throw new AppError('You are already following this user.', 400);
+  }
 
-  await Follow.create({ follower: followerId, following: followingId });
   await notificationService.notifyFollow(followingId, followerId);
   const [follower, following] = await Promise.all([
     User.findByIdAndUpdate(
@@ -223,19 +225,15 @@ exports.blockUser = async (blockerId, blockedId) => {
     throw new AppError('You cannot block yourself', 400);
   }
 
-  // 1. Check if block already exists
-  const existingBlock = await Block.findOne({
-    blocker: blockerId,
-    blocked: blockedId,
-  });
+  const blockResult = await Block.updateOne(
+    { blocker: blockerId, blocked: blockedId },
+    { $setOnInsert: { blocker: blockerId, blocked: blockedId } },
+    { upsert: true }
+  );
 
-  if (existingBlock) {
+  if (!blockResult.upsertedCount) {
     throw new AppError('User is already blocked', 409);
   }
-
-  // 2. Create the block
-  await Block.create({ blocker: blockerId, blocked: blockedId });
-
   // 3. Delete follow relationships and check if they existed
   // Did the blocker follow the blocked user?
   const followBlockerToBlocked = await Follow.findOneAndDelete({
@@ -288,16 +286,14 @@ exports.blockUser = async (blockerId, blockedId) => {
 };
 
 exports.unblockUser = async (blockerId, blockedId) => {
-  const existingBlock = await Block.findOne({
+  const deleted = await Block.findOneAndDelete({
     blocker: blockerId,
     blocked: blockedId,
   });
 
-  if (!existingBlock) {
+  if (!deleted) {
     throw new AppError('User is not blocked', 404);
   }
-
-  await Block.findByIdAndDelete(existingBlock._id);
 
   return { status: 'unblocked' };
 };

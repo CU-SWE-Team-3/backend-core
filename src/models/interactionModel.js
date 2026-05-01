@@ -44,6 +44,12 @@ interactionSchema.index({ targetId: 1, targetModel: 1, actionType: 1 });
 
 // Optimize querying a user's likes/reposts feed
 interactionSchema.index({ actorId: 1, actionType: 1 });
+interactionSchema.index(
+  { actorId: 1, targetId: 1, actionType: 1 },
+  { unique: true }
+);
+interactionSchema.index({ targetId: 1, actionType: 1, createdAt: -1 });
+interactionSchema.index({ actorId: 1, actionType: 1, createdAt: -1 });
 
 const Interaction = mongoose.model('Interaction', interactionSchema);
 

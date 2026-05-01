@@ -139,6 +139,7 @@ playlistSchema.index(
   { title: 'text', tags: 'text' },
   { weights: { title: 5, tags: 2 }, name: 'PlaylistTextIndex' }
 );
+playlistSchema.index({ creator: 1, isPrivate: 1, createdAt: -1 });
 
 const Playlist = mongoose.model('Playlist', playlistSchema);
 

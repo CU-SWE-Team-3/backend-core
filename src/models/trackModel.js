@@ -278,6 +278,11 @@ trackSchema.index({
   viralScore: -1,
 });
 
+trackSchema.index({ artist: 1, createdAt: -1 });
+trackSchema.index({ isPublic: 1, processingState: 1, viralScore: -1 });
+trackSchema.index({ genre: 1, isPublic: 1, viralScore: -1 });
+trackSchema.index({ releaseDate: 1, isPublic: 1 });
+
 const Track = mongoose.model('Track', trackSchema);
 
 module.exports = Track;

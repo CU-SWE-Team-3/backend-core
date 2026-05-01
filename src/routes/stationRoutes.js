@@ -38,13 +38,7 @@ router
     validate({ ...stationIdParamSchema, ...likeStationSchema }),
     stationController.likeStation
   )
-  .delete(
-    validate(stationIdParamSchema),
-    stationController.unlikeStation
-  )
-  .get(
-    validate(stationIdParamSchema),
-    stationController.checkStationLiked
-  );
+  .delete(validate(stationIdParamSchema), stationController.unlikeStation)
+  .get(validate(stationIdParamSchema), stationController.checkStationLiked);
 
 module.exports = router;

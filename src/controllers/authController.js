@@ -140,7 +140,15 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
     return next(new AppError('Email is required', 400));
   }
 
-  await authService.generatePasswordReset(email);
+  // Always return 200 regardless of outcome to prevent email enumeration.
+  // Errors (user not found, SMTP failure) are caught silently here.
+  try {
+    await authService.generatePasswordReset(email);
+  } catch (err) {
+    // Log for observability but never expose to client.
+    console.error('[forgotPassword] silent error:', err.message);
+  }
+
   res.status(200).json({
     success: true,
     message: 'If an account exists, a reset link has been sent.',

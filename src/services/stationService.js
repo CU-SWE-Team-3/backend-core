@@ -129,7 +129,12 @@ exports.unlikeStation = async (userId, stationId) => {
  * @param {number}  limit
  * @param {boolean} hydrate  – when true, fetch fresh tracks for every station
  */
-exports.getLikedStations = async (userId, page = 1, limit = 20, hydrate = true) => {
+exports.getLikedStations = async (
+  userId,
+  page = 1,
+  limit = 20,
+  hydrate = true
+) => {
   const skip = (page - 1) * limit;
 
   const likes = await StationLike.find({ user: userId })
@@ -158,10 +163,13 @@ exports.getLikedStations = async (userId, page = 1, limit = 20, hydrate = true) 
   }
 
   // Hydrate all in parallel; drop ones that no longer resolve
-  const hydrated = (
-    await Promise.all(likes.map((l) => hydrateStation(l)))
-  ).filter(Boolean);
-
+  const hydrated = [];
+  for (let i = 0; i < likes.length; i += 5) {
+    const batch = likes.slice(i, i + 5);
+    // eslint-disable-next-line no-await-in-loop
+    const results = await Promise.all(batch.map((l) => hydrateStation(l)));
+    hydrated.push(...results.filter(Boolean));
+  }
   return {
     total,
     page: parseInt(page, 10),
