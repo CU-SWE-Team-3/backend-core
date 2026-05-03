@@ -6,6 +6,8 @@
  */
 
 jest.mock('../services/authService');
+jest.mock('../services/notificationService');
+jest.mock('../services/firebaseService');
 jest.mock('../services/profileService');
 jest.mock('../services/networkService');
 jest.mock('../services/trackService');
@@ -289,7 +291,14 @@ describe('profileController', () => {
 describe('networkController', () => {
   test('followUser 200', async () => { networkService.followUser.mockImplementation(async () => ({ myFollowingCount: 1, theirFollowerCount: 1 })); const r = res(); await networkController.followUser({ user: { _id: UID }, params: { id: UID.replace('1', '2') } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
   test('unfollowUser 200', async () => { networkService.unfollowUser.mockImplementation(async () => ({ myFollowingCount: 0, theirFollowerCount: 0 })); const r = res(); await networkController.unfollowUser({ user: { _id: UID }, params: { id: UID.replace('1', '2') } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
-  test('getFeed 200', async () => { networkService.getUserFeed.mockImplementation(async () => [TRACK]); const r = res(); await networkController.getFeed({ user: { _id: UID } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
+  test('getFeed 200', async () => {
+    // networkService.getUserFeed was moved — manually stub it since auto-mock won't create it
+    networkService.getUserFeed = jest.fn().mockResolvedValue([TRACK]);
+    const r = res();
+    networkController.getFeed({ user: { _id: UID } }, r, jest.fn());
+    await new Promise(resolve => setImmediate(resolve));
+    expect(r.status).toHaveBeenCalledWith(200);
+  });
   test('getFollowers 200', async () => { networkService.getFollowers.mockImplementation(async () => [USER]); const r = res(); await networkController.getFollowers({ params: { userId: UID }, query: { page: '1', limit: '10' } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
   test('getFollowing 200', async () => { networkService.getFollowing.mockImplementation(async () => [USER]); const r = res(); await networkController.getFollowing({ params: { userId: UID }, query: { page: '1', limit: '10' } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
   test('getSuggestedUsers 200', async () => { networkService.getSuggestedUsers.mockImplementation(async () => [USER]); const r = res(); await networkController.getSuggestedUsers({ user: { id: UID }, query: { page: '1', limit: '10' } }, r, jest.fn()); expect(r.status).toHaveBeenCalledWith(200); });
@@ -318,14 +327,14 @@ describe('trackController', () => {
 // ─── INTERACTION CONTROLLER ───────────────────────────────────────────────────
 
 describe('interactionController', () => {
-  test('createRepost 201', async () => { interactionService.addRepost.mockImplementation(async () => ({ reposted: true })); const r = res(); await interactionController.createRepost({ user: { id: UID }, params: { id: TID } }, r); expect(r.status).toHaveBeenCalledWith(201); });
-  test('deleteRepost 200', async () => { interactionService.removeRepost.mockImplementation(async () => ({ reposted: false })); const r = res(); await interactionController.deleteRepost({ user: { id: UID }, params: { id: TID } }, r); expect(r.status).toHaveBeenCalledWith(200); });
+  test('createRepost 201', async () => { interactionService.addRepost.mockImplementation(async () => ({ reposted: true })); const r = res(); await interactionController.createRepost({ user: { id: UID }, params: { id: TID }, body: {} }, r); expect(r.status).toHaveBeenCalledWith(201); });
+  test('deleteRepost 200', async () => { interactionService.removeRepost.mockImplementation(async () => ({ reposted: false })); const r = res(); await interactionController.deleteRepost({ user: { id: UID }, params: { id: TID }, body: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
   test('getTrackReposters 200', async () => { interactionService.getTrackEngagers.mockImplementation(async () => ({ users: [], total: 0, page: 1, totalPages: 0 })); const r = res(); await interactionController.getTrackReposters({ params: { id: TID }, query: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
   test('getTrackLikers 200', async () => { interactionService.getTrackEngagers.mockImplementation(async () => ({ users: [], total: 0, page: 1, totalPages: 0 })); const r = res(); await interactionController.getTrackLikers({ params: { id: TID }, query: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
   test('getUserRepostsFeed 200', async () => { interactionService.getUserReposts.mockImplementation(async () => ({ repostedTracks: [], total: 0, page: 1, totalPages: 0 })); const r = res(); await interactionController.getUserRepostsFeed({ params: { userId: UID }, query: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
   test('getUserLikesFeed 200', async () => { interactionService.getUserLikes.mockImplementation(async () => ({ likedTracks: [], total: 0, page: 1, totalPages: 0 })); const r = res(); await interactionController.getUserLikesFeed({ params: { userId: UID }, query: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
-  test('createLike 201', async () => { interactionService.addLike.mockImplementation(async () => ({ liked: true })); const r = res(); await interactionController.createLike({ user: { id: UID }, params: { id: TID } }, r); expect(r.status).toHaveBeenCalledWith(201); });
-  test('deleteLike 200', async () => { interactionService.removeLike.mockImplementation(async () => ({ liked: false })); const r = res(); await interactionController.deleteLike({ user: { id: UID }, params: { id: TID } }, r); expect(r.status).toHaveBeenCalledWith(200); });
+  test('createLike 201', async () => { interactionService.addLike.mockImplementation(async () => ({ liked: true })); const r = res(); await interactionController.createLike({ user: { id: UID }, params: { id: TID }, body: {} }, r); expect(r.status).toHaveBeenCalledWith(201); });
+  test('deleteLike 200', async () => { interactionService.removeLike.mockImplementation(async () => ({ liked: false })); const r = res(); await interactionController.deleteLike({ user: { id: UID }, params: { id: TID }, body: {} }, r); expect(r.status).toHaveBeenCalledWith(200); });
 });
 
 // ─── COMMENT CONTROLLER ───────────────────────────────────────────────────────

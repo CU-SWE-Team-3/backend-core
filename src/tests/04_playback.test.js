@@ -40,10 +40,10 @@ describe('playbackService.checkAccessibility', () => {
     expect(playbackService.checkAccessibility({ _id: 'me' }, pt, 'stream')).toBe(true);
   });
   test('allows download for premium user', () => {
-    expect(playbackService.checkAccessibility({ _id: 'u', isPremium: true }, TRACK, 'download')).toBe(true);
+    expect(playbackService.checkAccessibility({ _id: 'u', subscriptionPlan: 'Go+' }, TRACK, 'download')).toBe(true);
   });
   test('throws 403 download for non-premium', () => {
-    expect(() => playbackService.checkAccessibility({ _id: 'u', isPremium: false }, TRACK, 'download')).toThrow('Premium Plan');
+    expect(() => playbackService.checkAccessibility({ _id: 'u', subscriptionPlan: 'Free' }, TRACK, 'download')).toThrow('Go+');
   });
   test('throws 400 for invalid action', () => {
     expect(() => playbackService.checkAccessibility({ _id: 'u' }, TRACK, 'burn')).toThrow('Invalid action');
@@ -72,7 +72,7 @@ describe('playbackService.recordPlaybackProgress', () => {
     mockHistory({ isPlayCounted: false }, { isPlayCounted: true });
     Track.findByIdAndUpdate.mockResolvedValue({});
     await playbackService.recordPlaybackProgress(UID, TID, 185);
-    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, { $inc: { playCount: 1 } });
+    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, { $inc: { playCount: 1, viralScore: 1 } });
   });
 
   test('does NOT increment playCount at 50%', async () => {
@@ -108,13 +108,17 @@ describe('playbackService.recordPlaybackProgress', () => {
 // ─── getRecentlyPlayed ────────────────────────────────────────────────────────
 
 describe('playbackService.getRecentlyPlayed', () => {
-  const mkChain = () => ({
-    select: jest.fn().mockReturnThis(),
-    sort: jest.fn().mockReturnThis(),
-    skip: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    populate: jest.fn().mockResolvedValue([{ track: TRACK }]),
-  });
+  const mkChain = () => {
+    const chain = {
+      select: jest.fn().mockReturnThis(),
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+    };
+    // Service calls .populate().populate() — second populate resolves
+    chain.populate = jest.fn().mockReturnValueOnce(chain).mockResolvedValueOnce([{ track: TRACK }]);
+    return chain;
+  };
 
   test('returns paginated history', async () => {
     ListenHistory.find.mockReturnValue(mkChain());

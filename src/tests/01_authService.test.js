@@ -96,7 +96,7 @@ describe('verifyRefreshToken', () => {
     jwt.verify.mockReturnValueOnce({ id: '1' });
     User.findById.mockResolvedValue(null);
     await expect(authService.verifyRefreshToken('tok')).rejects.toThrow(
-      'Unauthorized'
+      'Invalid or revoked refresh token'
     );
   });
 
@@ -104,7 +104,7 @@ describe('verifyRefreshToken', () => {
     jwt.verify.mockReturnValueOnce({ id: '1' });
     User.findById.mockResolvedValue(mkUser({ refreshToken: 'different' }));
     await expect(authService.verifyRefreshToken('tok')).rejects.toThrow(
-      'Unauthorized'
+      'Invalid or revoked refresh token'
     );
   });
 });
@@ -252,15 +252,16 @@ describe('generatePasswordReset', () => {
     ).rejects.toThrow('No user found with that email.');
   });
 
-  test('clears token and throws 500 if email fails', async () => {
+  test('silently continues when email fails (token stays set)', async () => {
     const user = mkUser();
     User.findOne.mockResolvedValue(user);
     crypto.randomBytes.mockReturnValue({ toString: () => 'rtok' });
     sendEmail.mockRejectedValue(new Error('SMTP'));
-    await expect(
-      authService.generatePasswordReset('dj@beats.com')
-    ).rejects.toThrow('Email could not be sent');
-    expect(user.resetPasswordToken).toBeUndefined();
+    // Backend changed: no longer throws on email failure — returns token regardless
+    const result = await authService.generatePasswordReset('dj@beats.com');
+    expect(result.resetToken).toBe('rtok');
+    // Token is kept (not cleared) so user can still use it if email arrived
+    expect(user.resetPasswordToken).toBe('rtok');
   });
 });
 

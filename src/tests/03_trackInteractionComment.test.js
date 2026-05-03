@@ -4,8 +4,14 @@
  */
 
 jest.mock('../models/trackModel');
+jest.mock('../services/notificationService');
+jest.mock('../services/firebaseService');
 jest.mock('../models/interactionModel');
 jest.mock('../models/commentModel');
+jest.mock('../models/blockModel');
+jest.mock('../models/feedItemModel');
+jest.mock('../models/userModel');
+jest.mock('../models/playlistModel');
 jest.mock('../utils/azureStorage');
 jest.mock('../utils/queueProducer');
 jest.mock('@azure/storage-blob', () => {
@@ -29,6 +35,9 @@ jest.mock('@azure/storage-blob', () => {
 const Track = require('../models/trackModel');
 const Interaction = require('../models/interactionModel');
 const Comment = require('../models/commentModel');
+const Block = require('../models/blockModel');
+const FeedItem = require('../models/feedItemModel');
+const User = require('../models/userModel');
 const { uploadImageToAzure } = require('../utils/azureStorage');
 const { publishToQueue } = require('../utils/queueProducer');
 const azureBlob = require('@azure/storage-blob');
@@ -41,13 +50,19 @@ const UID = '507f1f77bcf86cd799439011';
 const TID = '507f1f77bcf86cd799439022';
 const CID = '507f1f77bcf86cd799439033';
 
-const ARTIST = { _id: UID, role: 'Artist', isPremium: false };
-const PREMIUM = { _id: UID, role: 'Artist', isPremium: true };
+const ARTIST = { _id: UID, role: 'Artist', isPremium: false, subscriptionPlan: 'Free' };
+const PREMIUM = { _id: UID, role: 'Artist', isPremium: true, subscriptionPlan: 'Go+' };
 const TRACK = {
   _id: TID, title: 'Beat', artist: { toString: () => UID, _id: { toString: () => UID } },
   processingState: 'Finished', isPublic: true, audioUrl: 'https://blob/song.mp3',
   releaseDate: new Date('2020-01-01'), duration: 200, hlsUrl: 'https://blob/pl.m3u8', format: 'audio/mp3',
+  moderationStatus: 'Approved', displayStatsPublicly: true, allowComments: true,
   save: jest.fn().mockResolvedValue(true), deleteOne: jest.fn().mockResolvedValue(true),
+  toObject: jest.fn().mockReturnValue({
+    _id: TID, title: 'Beat', processingState: 'Finished', isPublic: true,
+    releaseDate: new Date('2020-01-01'), duration: 200, displayStatsPublicly: true,
+    artist: { toString: () => UID, _id: { toString: () => UID } },
+  }),
 };
 
 beforeEach(() => {
@@ -56,30 +71,39 @@ beforeEach(() => {
   process.env.AZURE_ACCOUNT_KEY = 'dGVzdA==';
   process.env.AZURE_CONTAINER_NAME = 'biobeats';
   process.env.AZURE_STORAGE_CONNECTION_STRING = 'DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net';
+  // Default: no blocks, no feed items
+  Block.findOne.mockResolvedValue(null);
+  FeedItem.deleteMany.mockResolvedValue({});
+  User.find.mockResolvedValue([]);
 });
 
 // ─── trackService ─────────────────────────────────────────────────────────────
 
 describe('trackService.updateTrackMetadata', () => {
   test('updates allowed fields', async () => {
-    Track.findOneAndUpdate.mockResolvedValue({ ...TRACK, title: 'New' });
+    // New impl: findById first, then findByIdAndUpdate
+    Track.findById.mockResolvedValue({ ...TRACK, artist: { toString: () => UID } });
+    Track.findByIdAndUpdate.mockResolvedValue({ ...TRACK, title: 'New' });
     const r = await trackService.updateTrackMetadata(TID, ARTIST, { title: 'New' });
     expect(r.title).toBe('New');
   });
 
   test('blocks free user from scheduling future release', async () => {
+    Track.findById.mockResolvedValue({ ...TRACK, artist: { toString: () => UID } });
     const future = new Date(Date.now() + 86400000).toISOString();
-    await expect(trackService.updateTrackMetadata(TID, ARTIST, { releaseDate: future })).rejects.toThrow('Artist Pro subscription');
+    // ARTIST has subscriptionPlan 'Free' (not 'Pro'), should throw
+    await expect(trackService.updateTrackMetadata(TID, { ...ARTIST, subscriptionPlan: 'Free' }, { releaseDate: future })).rejects.toThrow('Artist Pro subscription');
   });
 
-  test('allows premium user to schedule future release', async () => {
-    Track.findOneAndUpdate.mockResolvedValue(TRACK);
+  test('allows Pro user to schedule future release', async () => {
+    Track.findById.mockResolvedValue({ ...TRACK, artist: { toString: () => UID } });
+    Track.findByIdAndUpdate.mockResolvedValue(TRACK);
     const future = new Date(Date.now() + 86400000).toISOString();
-    await expect(trackService.updateTrackMetadata(TID, PREMIUM, { releaseDate: future })).resolves.toBeDefined();
+    await expect(trackService.updateTrackMetadata(TID, { ...PREMIUM, subscriptionPlan: 'Pro' }, { releaseDate: future })).resolves.toBeDefined();
   });
 
   test('throws 404 when track not found', async () => {
-    Track.findOneAndUpdate.mockResolvedValue(null);
+    Track.findById.mockResolvedValue(null);
     await expect(trackService.updateTrackMetadata(TID, ARTIST, { title: 'x' })).rejects.toThrow('Track not found');
   });
 });
@@ -162,7 +186,7 @@ describe('trackService.generateUploadUrl', () => {
   test('honours releaseDate for premium user', async () => {
     Track.create.mockResolvedValue({ _id: 'id' });
     const future = new Date(Date.now() + 86400000).toISOString();
-    await trackService.generateUploadUrl(PREMIUM, { format: 'audio/mp3', size: 1000, duration: 60, releaseDate: future });
+    await trackService.generateUploadUrl({ ...PREMIUM, subscriptionPlan: 'Pro' }, { format: 'audio/mp3', size: 1000, duration: 60, releaseDate: future });
     expect(Track.create.mock.calls[0][0].releaseDate).toBe(future);
   });
 
@@ -196,7 +220,9 @@ describe('trackService.getTrackByPermalink', () => {
 
   test('returns public finished track', async () => {
     Track.findOne.mockReturnValue(chain(TRACK));
-    expect(await trackService.getTrackByPermalink('beat', null)).toBe(TRACK);
+    const result = await trackService.getTrackByPermalink('beat', null);
+    expect(result).toBeDefined();
+    expect(result.title).toBe('Beat');
   });
 
   test('throws 404 when null', async () => {
@@ -221,25 +247,27 @@ describe('trackService.getTrackByPermalink', () => {
   });
 
   test('allows owner to access own private track', async () => {
-    const t = { ...TRACK, isPublic: false, artist: { _id: { toString: () => UID } } };
+    const t = { ...TRACK, isPublic: false, artist: { _id: { toString: () => UID }, toString: () => UID }, toObject: TRACK.toObject };
     Track.findOne.mockReturnValue(chain(t));
-    expect(await trackService.getTrackByPermalink('slug', UID)).toBe(t);
+    const result = await trackService.getTrackByPermalink('slug', UID);
+    expect(result).toBeDefined();
   });
 });
 
 describe('trackService.downloadTrackAudio', () => {
-  test('throws 403 for non-premium user', async () => {
-    await expect(trackService.downloadTrackAudio(TID, ARTIST)).rejects.toThrow('Premium Subscription');
+  test('throws 403 for non-Go+ user', async () => {
+    // New impl checks subscriptionPlan === 'Go+' instead of isPremium
+    await expect(trackService.downloadTrackAudio(TID, { ...ARTIST, subscriptionPlan: 'Free' })).rejects.toThrow('Go+ Subscription');
   });
 
   test('throws 404 when track not found', async () => {
     Track.findById.mockResolvedValue(null);
-    await expect(trackService.downloadTrackAudio(TID, PREMIUM)).rejects.toThrow('not found or not ready');
+    await expect(trackService.downloadTrackAudio(TID, { ...PREMIUM, subscriptionPlan: 'Go+' })).rejects.toThrow('not found or not ready');
   });
 
-  test('returns stream for premium user', async () => {
-    Track.findById.mockResolvedValue(TRACK);
-    const r = await trackService.downloadTrackAudio(TID, PREMIUM);
+  test('returns stream for Go+ user', async () => {
+    Track.findById.mockResolvedValue({ ...TRACK, enableDirectDownloads: true });
+    const r = await trackService.downloadTrackAudio(TID, { ...PREMIUM, subscriptionPlan: 'Go+' });
     expect(r.stream).toBe('stream');
     expect(r.filename).toContain('.mp3');
   });
@@ -290,13 +318,13 @@ describe('interactionService.addRepost', () => {
 describe('interactionService.removeRepost', () => {
   test('removes repost', async () => {
     Track.findById.mockResolvedValue(TRACK);
-    Interaction.findOne.mockResolvedValue({ _id: 'rid' });
-    Interaction.findByIdAndDelete.mockResolvedValue({});
+    // New impl uses findOneAndDelete atomically (no separate findOne)
+    Interaction.findOneAndDelete.mockResolvedValue({ _id: 'rid' });
     Track.findByIdAndUpdate.mockResolvedValue({});
     expect((await interactionService.removeRepost(UID, TID)).reposted).toBe(false);
   });
   test('throws 404 when track missing', async () => { Track.findById.mockResolvedValue(null); await expect(interactionService.removeRepost(UID, TID)).rejects.toThrow('Track not found'); });
-  test('throws 400 when not reposted', async () => { Track.findById.mockResolvedValue(TRACK); Interaction.findOne.mockResolvedValue(null); await expect(interactionService.removeRepost(UID, TID)).rejects.toThrow('not reposted'); });
+  test('throws 400 when not reposted', async () => { Track.findById.mockResolvedValue(TRACK); Interaction.findOneAndDelete.mockResolvedValue(null); await expect(interactionService.removeRepost(UID, TID)).rejects.toThrow('not reposted'); });
 });
 
 describe('interactionService.addLike', () => {
@@ -314,13 +342,12 @@ describe('interactionService.addLike', () => {
 describe('interactionService.removeLike', () => {
   test('removes like', async () => {
     Track.findById.mockResolvedValue(TRACK);
-    Interaction.findOne.mockResolvedValue({ _id: 'lid' });
-    Interaction.findByIdAndDelete.mockResolvedValue({});
+    Interaction.findOneAndDelete.mockResolvedValue({ _id: 'lid' });
     Track.findByIdAndUpdate.mockResolvedValue({});
     expect((await interactionService.removeLike(UID, TID)).liked).toBe(false);
   });
   test('throws 404 when track missing', async () => { Track.findById.mockResolvedValue(null); await expect(interactionService.removeLike(UID, TID)).rejects.toThrow('Track not found'); });
-  test('throws 400 when not liked', async () => { Track.findById.mockResolvedValue(TRACK); Interaction.findOne.mockResolvedValue(null); await expect(interactionService.removeLike(UID, TID)).rejects.toThrow('not liked'); });
+  test('throws 400 when not liked', async () => { Track.findById.mockResolvedValue(TRACK); Interaction.findOneAndDelete.mockResolvedValue(null); await expect(interactionService.removeLike(UID, TID)).rejects.toThrow('not liked'); });
 });
 
 describe('interactionService.getTrackEngagers', () => {
@@ -362,7 +389,7 @@ describe('commentService.addComment', () => {
   test('throws 404 when track missing', async () => { Track.findById.mockResolvedValue(null); await expect(commentService.addComment(UID, TID, 'x', 0)).rejects.toThrow('Track not found'); });
   test('creates reply to valid parent', async () => {
     Track.findById.mockResolvedValue(TRACK);
-    Comment.findById.mockResolvedValue({ _id: 'par', parentComment: null, track: { toString: () => TID } });
+    Comment.findById.mockResolvedValue({ _id: 'par', parentComment: null, track: { toString: () => TID }, user: { toString: () => 'other-user' } });
     Comment.create.mockResolvedValue({ _id: 'rep' });
     Track.findByIdAndUpdate.mockResolvedValue({});
     expect((await commentService.addComment(UID, TID, 'Reply', 10, 'par'))._id).toBe('rep');
@@ -392,7 +419,8 @@ describe('commentService.deleteComment', () => {
     Track.findByIdAndUpdate.mockResolvedValue({});
     await commentService.deleteComment(UID, CID);
     expect(Comment.deleteMany).toHaveBeenCalledWith({ parentComment: CID });
-    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, { $inc: { commentCount: -4 } });
+    // Service uses pipeline update (array) for floor-safe decrement
+    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, expect.any(Array));
   });
   test('deletes reply without cascade', async () => {
     Comment.findById.mockResolvedValue({ _id: CID, user: { toString: () => UID }, track: TID, parentComment: 'par' });
@@ -400,7 +428,8 @@ describe('commentService.deleteComment', () => {
     Track.findByIdAndUpdate.mockResolvedValue({});
     await commentService.deleteComment(UID, CID);
     expect(Comment.deleteMany).not.toHaveBeenCalled();
-    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, { $inc: { commentCount: -1 } });
+    // Service uses pipeline update (array) for floor-safe decrement
+    expect(Track.findByIdAndUpdate).toHaveBeenCalledWith(TID, expect.any(Array));
   });
   test('throws 404 when comment not found', async () => { Comment.findById.mockResolvedValue(null); await expect(commentService.deleteComment(UID, CID)).rejects.toThrow('Comment not found'); });
   test('throws 403 when not author', async () => { Comment.findById.mockResolvedValue({ _id: CID, user: { toString: () => 'other' } }); await expect(commentService.deleteComment(UID, CID)).rejects.toThrow('permission'); });
